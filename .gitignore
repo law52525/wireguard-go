@@ -1,1 +1,33 @@
+# 二进制可执行文件
 wireguard-go
+cmd/wg-go/wg-go
+
+# 敏感配置文件
+wg0.conf
+*.conf
+
+# 编译产物和临时文件
+*.o
+*.a
+*.so
+*.exe
+.DS_Store
+
+# IDE 和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统生成的文件
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 日志文件
+*.log
+
+# 临时目录
+tmp/
+temp/

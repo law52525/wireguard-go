@@ -1,0 +1,245 @@
+#!/bin/bash
+
+# WireGuard-Go 停止脚本
+# Stop Script for WireGuard-Go
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+print_header() {
+    echo -e "${BLUE}"
+    echo "🛑 WireGuard-Go 停止脚本"
+    echo "   Stop Script"
+    echo "=================="
+    echo -e "${NC}"
+}
+
+print_step() {
+    echo -e "${GREEN}▶ $1${NC}"
+}
+
+print_info() {
+    echo -e "${YELLOW}ℹ $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# 检查权限
+check_permissions() {
+    if [[ $EUID -ne 0 ]]; then
+        print_error "需要 root 权限来停止 WireGuard"
+        echo "请使用: sudo $0"
+        exit 1
+    fi
+}
+
+# 停止 WireGuard 进程
+stop_wireguard() {
+    print_step "1. 停止 WireGuard 进程"
+    
+    if pgrep -l wireguard-go >/dev/null 2>&1; then
+        print_info "发现运行中的 WireGuard 进程:"
+        pgrep -l wireguard-go
+        
+        print_info "正在停止 WireGuard 进程..."
+        pkill wireguard-go
+        
+        # 等待进程完全停止
+        sleep 2
+        
+        if pgrep -l wireguard-go >/dev/null 2>&1; then
+            print_error "进程仍在运行，尝试强制停止..."
+            pkill -9 wireguard-go
+            sleep 1
+        fi
+        
+        print_success "WireGuard 进程已停止"
+    else
+        print_info "没有发现运行中的 WireGuard 进程"
+    fi
+}
+
+# 检查接口状态
+check_interfaces() {
+    print_step "2. 检查网络接口状态"
+    
+    if ifconfig utun8 >/dev/null 2>&1; then
+        print_info "utun8 接口仍然存在:"
+        ifconfig utun8 | head -2
+        print_info "接口通常会在进程停止后自动消失"
+    else
+        print_success "utun8 接口已清理"
+    fi
+    
+    # 显示剩余的 utun 接口
+    UTUN_COUNT=$(ifconfig | grep -c "^utun" || true)
+    print_info "当前 utun 接口数量: $UTUN_COUNT"
+}
+
+# 清理路由
+clean_routes() {
+    print_step "3. 清理 VPN 路由"
+    
+    # 检查是否有 VPN 相关路由
+    VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
+    
+    if [[ -n "$VPN_ROUTES" ]]; then
+        print_info "发现 VPN 相关路由:"
+        echo "$VPN_ROUTES"
+        
+        print_info "清理路由..."
+        # 删除常见的 VPN 路由
+        route delete -net 192.168.11.0/24 2>/dev/null || true
+        route delete -net 192.168.10.0/24 2>/dev/null || true
+        
+        # 检查是否还有全局 VPN 路由
+        if netstat -rn | grep "0.0.0.0/1.*utun" >/dev/null 2>&1; then
+            print_info "发现全局 VPN 路由，正在清理..."
+            route delete -net 0.0.0.0/1 2>/dev/null || true
+            route delete -net 128.0.0.0/1 2>/dev/null || true
+        fi
+        
+        print_success "路由清理完成"
+    else
+        print_info "没有发现 VPN 相关路由"
+    fi
+}
+
+# 清理 Socket 文件
+clean_sockets() {
+    print_step "4. 清理 Socket 文件"
+    
+    SOCKET_DIR="/var/run/wireguard"
+    
+    if [[ -d "$SOCKET_DIR" ]]; then
+        SOCKET_FILES=$(ls -1 "$SOCKET_DIR"/*.sock 2>/dev/null || true)
+        
+        if [[ -n "$SOCKET_FILES" ]]; then
+            print_info "发现 Socket 文件:"
+            ls -la "$SOCKET_DIR"/*.sock 2>/dev/null || true
+            
+            print_info "清理 Socket 文件..."
+            rm -f "$SOCKET_DIR"/*.sock
+            
+            print_success "Socket 文件已清理"
+        else
+            print_info "没有发现 Socket 文件"
+        fi
+        
+        # 显示目录状态
+        print_info "Socket 目录状态:"
+        ls -la "$SOCKET_DIR"
+    else
+        print_info "Socket 目录不存在"
+    fi
+}
+
+# 验证清理结果
+verify_cleanup() {
+    print_step "5. 验证清理结果"
+    
+    # 检查进程
+    if pgrep -l wireguard-go >/dev/null 2>&1; then
+        print_error "WireGuard 进程仍在运行:"
+        pgrep -l wireguard-go
+    else
+        print_success "✅ WireGuard 进程已完全停止"
+    fi
+    
+    # 检查接口
+    if ifconfig utun8 >/dev/null 2>&1; then
+        print_info "⚠️  utun8 接口仍然存在"
+    else
+        print_success "✅ utun8 接口已清理"
+    fi
+    
+    # 检查路由
+    VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
+    if [[ -n "$VPN_ROUTES" ]]; then
+        print_info "⚠️  仍有 VPN 相关路由:"
+        echo "$VPN_ROUTES"
+    else
+        print_success "✅ VPN 路由已清理"
+    fi
+    
+    # 检查 Socket
+    SOCKET_FILES=$(ls -1 /var/run/wireguard/*.sock 2>/dev/null || true)
+    if [[ -n "$SOCKET_FILES" ]]; then
+        print_info "⚠️  仍有 Socket 文件"
+    else
+        print_success "✅ Socket 文件已清理"
+    fi
+}
+
+# 显示清理后状态
+show_final_status() {
+    print_step "6. 清理后系统状态"
+    
+    echo
+    echo "🔍 系统状态检查:"
+    
+    echo
+    echo "📊 进程状态:"
+    if pgrep -l wireguard >/dev/null 2>&1; then
+        pgrep -l wireguard
+    else
+        echo "  没有 WireGuard 相关进程"
+    fi
+    
+    echo
+    echo "🌐 网络接口:"
+    UTUN_INTERFACES=$(ifconfig | grep "^utun" || true)
+    if [[ -n "$UTUN_INTERFACES" ]]; then
+        echo "$UTUN_INTERFACES"
+    else
+        echo "  没有 utun 接口"
+    fi
+    
+    echo
+    echo "🛣️  路由表 (VPN 相关):"
+    VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
+    if [[ -n "$VPN_ROUTES" ]]; then
+        echo "$VPN_ROUTES"
+    else
+        echo "  没有 VPN 相关路由"
+    fi
+    
+    echo
+    print_success "WireGuard 清理完成！"
+    echo
+    echo "📋 如需重新启动:"
+    echo "  sudo ./quick-start.sh"
+    echo
+    echo "📖 详细文档: 查看 COMPLETE_GUIDE.md"
+}
+
+# 主函数
+main() {
+    print_header
+    
+    check_permissions
+    stop_wireguard
+    check_interfaces
+    clean_routes
+    clean_sockets
+    verify_cleanup
+    show_final_status
+    
+    echo
+    print_success "🎉 WireGuard-Go 停止完成！"
+}
+
+# 运行主函数
+main "$@"
