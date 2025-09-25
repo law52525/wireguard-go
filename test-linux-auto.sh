@@ -3,7 +3,7 @@
 # WireGuard-Go Linux 自动化测试脚本
 # Automated Linux Testing Script for WireGuard-Go
 
-set -e
+# set -e
 
 # Colors
 RED='\033[0;31m'
@@ -46,6 +46,29 @@ print_failure() {
 
 print_warning() {
     echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+# 检查 WireGuard 进程是否在运行
+check_wireguard_process() {
+    local interface_name="$1"
+    local timeout="${2:-10}"  # 默认超时 10 秒
+    
+    print_info "等待 WireGuard 进程启动 (最多 $timeout 秒)..."
+    
+    for i in $(seq 1 $timeout); do
+        if ps aux | grep -v grep | grep "wireguard-go.*$interface_name" >/dev/null; then
+            print_success "WireGuard 进程已启动"
+            return 0
+        fi
+        sleep 1
+        echo -n "."
+    done
+    
+    echo
+    print_failure "WireGuard 进程启动超时"
+    print_info "当前所有 WireGuard 进程:"
+    ps aux | grep -v grep | grep wireguard-go || echo "  无 WireGuard 进程运行"
+    return 1
 }
 
 # 检查权限
@@ -104,7 +127,7 @@ test_compilation() {
     fi
     
     print_info "编译命令行工具..."
-    if go build -o cmd/wg-go/wg-go ./cmd/wg-go 2>/dev/null; then
+    if (cd cmd/wg-go && go build -o wg-go . && cd ../..); then
         print_success "命令行工具编译成功"
     else
         print_failure "命令行工具编译失败"
@@ -156,12 +179,7 @@ test_interface_creation() {
     LOG_LEVEL=verbose ./wireguard-go $test_interface &
     local wg_pid=$!
     
-    sleep 3
-    
-    if kill -0 $wg_pid 2>/dev/null; then
-        print_success "守护进程启动成功"
-    else
-        print_failure "守护进程启动失败"
+    if ! check_wireguard_process $test_interface 5; then
         return 1
     fi
     
@@ -216,10 +234,7 @@ EOF
     LOG_LEVEL=verbose ./wireguard-go $test_interface &
     local wg_pid=$!
     
-    sleep 3
-    
-    if ! kill -0 $wg_pid 2>/dev/null; then
-        print_failure "DNS 测试守护进程启动失败"
+    if ! check_wireguard_process $test_interface 5; then
         rm -f test-config.conf
         return 1
     fi
@@ -303,7 +318,9 @@ test_network_functionality() {
     ./wireguard-go $test_interface &
     local wg_pid=$!
     
-    sleep 3
+    if ! check_wireguard_process $test_interface 5; then
+        return 1
+    fi
     
     print_info "测试 IP 地址配置..."
     if ip addr add 10.200.0.1/24 dev $test_interface 2>/dev/null; then
@@ -404,10 +421,29 @@ EOF
 # 清理函数
 cleanup() {
     print_info "清理测试环境..."
-    pkill wireguard-go 2>/dev/null || true
+    
+    # 显示清理前的进程状态
+    local wg_processes=$(ps aux | grep -v grep | grep wireguard-go | wc -l)
+    if [ $wg_processes -gt 0 ]; then
+        print_info "发现 $wg_processes 个 WireGuard 进程，正在清理..."
+        ps aux | grep -v grep | grep wireguard-go
+    fi
+    
+    # 强制终止所有 WireGuard 进程
+    pkill -9 wireguard-go 2>/dev/null || true
+    sleep 2
+    
+    # 清理文件
     rm -f /var/run/wireguard/wgtest*.sock
     rm -f test-config.conf
-    sleep 1
+    
+    # 验证清理结果
+    local remaining=$(ps aux | grep -v grep | grep wireguard-go | wc -l)
+    if [ $remaining -eq 0 ]; then
+        print_info "所有 WireGuard 进程已清理"
+    else
+        print_warning "仍有 $remaining 个 WireGuard 进程运行"
+    fi
 }
 
 # 主函数

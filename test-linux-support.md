@@ -35,7 +35,7 @@ cd wireguard-go
 
 # 3. 编译项目
 go build -o wireguard-go .
-go build -o cmd/wg-go/wg-go ./cmd/wg-go
+cd cmd/wg-go && go build -o wg-go . && cd ../..
 
 # 4. 检查编译结果
 ls -la wireguard-go cmd/wg-go/wg-go
