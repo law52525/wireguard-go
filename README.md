@@ -2,6 +2,35 @@
 
 This is an implementation of WireGuard in Go.
 
+## 🆕 Enhanced with Dynamic DNS Support
+
+This fork includes advanced **Dynamic DNS Endpoint Monitoring** functionality:
+
+- **🔄 Automatic IP Change Detection**: Monitors domain-based endpoints for IP address changes
+- **🔗 Auto-Reconnection**: Automatically updates connections when IPs change
+- **⏱️ Configurable Monitoring**: Customizable DNS resolution intervals
+- **📊 Management Tools**: Built-in commands for monitoring and configuration
+- **🔒 Thread-Safe**: Robust implementation with comprehensive error handling
+- **⬅️ Backward Compatible**: Works seamlessly with existing static IP configurations
+
+### Quick Start with Dynamic DNS
+
+```bash
+# Configure peer with domain endpoint
+[Peer]
+PublicKey = ...
+Endpoint = vpn.example.com:51820  # Will be monitored automatically!
+AllowedIPs = 10.0.0.2/32
+
+# Manage DNS monitoring
+./wg-go dns wg0 show           # Show DNS status
+./wg-go dns wg0 30             # Set 30-second monitoring interval
+./wg-go monitor wg0            # Live monitoring with DNS status
+```
+
+Perfect for dynamic DNS services, cloud instances, and environments where endpoints change IPs frequently.
+
+
 ## Usage
 
 Most Linux kernel WireGuard users are used to adding an interface with `ip link add wg0 type wireguard`. With wireguard-go, instead simply run:

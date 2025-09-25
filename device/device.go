@@ -86,9 +86,10 @@ type Device struct {
 		mtu    atomic.Int32
 	}
 
-	ipcMutex sync.RWMutex
-	closed   chan struct{}
-	log      *Logger
+	ipcMutex   sync.RWMutex
+	closed     chan struct{}
+	log        *Logger
+	dnsMonitor *DNSMonitor // DNS monitor for dynamic endpoint resolution
 }
 
 // deviceState represents the state of a Device.
@@ -130,6 +131,11 @@ func removePeerLocked(device *Device, peer *Peer, key NoisePublicKey) {
 	// stop routing and processing of packets
 	device.allowedips.RemoveByPeer(peer)
 	peer.Stop()
+
+	// remove from DNS monitoring if applicable
+	if device.dnsMonitor != nil {
+		device.dnsMonitor.RemovePeer(key)
+	}
 
 	// remove from peer map
 	delete(device.peers.keyMap, key)
@@ -187,6 +193,12 @@ func (device *Device) upLocked() error {
 		}
 	}
 	device.peers.RUnlock()
+
+	// Start DNS monitoring
+	if device.dnsMonitor != nil {
+		device.dnsMonitor.Start()
+	}
+
 	return nil
 }
 
@@ -196,6 +208,11 @@ func (device *Device) downLocked() error {
 	err := device.BindClose()
 	if err != nil {
 		device.log.Errorf("Bind close failed: %v", err)
+	}
+
+	// Stop DNS monitoring
+	if device.dnsMonitor != nil {
+		device.dnsMonitor.Stop()
 	}
 
 	device.peers.RLock()
@@ -297,6 +314,9 @@ func NewDevice(tunDevice tun.Device, bind conn.Bind, logger *Logger) *Device {
 	device.peers.keyMap = make(map[NoisePublicKey]*Peer)
 	device.rate.limiter.Init()
 	device.indexTable.Init()
+
+	// Initialize DNS monitor with default 60-second interval
+	device.dnsMonitor = NewDNSMonitor(device, 60*time.Second)
 
 	device.PopulatePools()
 
@@ -401,6 +421,21 @@ func (device *Device) Close() {
 
 func (device *Device) Wait() chan struct{} {
 	return device.closed
+}
+
+// SetDNSMonitorInterval sets the interval for DNS monitoring
+func (device *Device) SetDNSMonitorInterval(interval time.Duration) {
+	if device.dnsMonitor != nil {
+		device.dnsMonitor.UpdateMonitorInterval(interval)
+	}
+}
+
+// GetDNSMonitoredPeers returns information about peers being monitored for DNS changes
+func (device *Device) GetDNSMonitoredPeers() map[NoisePublicKey]*MonitoredPeerInfo {
+	if device.dnsMonitor != nil {
+		return device.dnsMonitor.GetMonitoredPeers()
+	}
+	return make(map[NoisePublicKey]*MonitoredPeerInfo)
 }
 
 func (device *Device) SendKeepalivesToPeersWithCurrentKeypair() {

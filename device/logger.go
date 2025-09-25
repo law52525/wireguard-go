@@ -6,6 +6,7 @@
 package device
 
 import (
+	"io"
 	"log"
 	"os"
 )
@@ -34,9 +35,16 @@ func DiscardLogf(format string, args ...any) {}
 // It logs at the specified log level and above.
 // It decorates log lines with the log level, date, time, and prepend.
 func NewLogger(level int, prepend string) *Logger {
+	return NewLoggerWithWriter(level, prepend, os.Stdout)
+}
+
+// NewLoggerWithWriter constructs a Logger that writes to the specified writer.
+// It logs at the specified log level and above.
+// It decorates log lines with the log level, date, time, and prepend.
+func NewLoggerWithWriter(level int, prepend string, writer io.Writer) *Logger {
 	logger := &Logger{DiscardLogf, DiscardLogf}
 	logf := func(prefix string) func(string, ...any) {
-		return log.New(os.Stdout, prefix+": "+prepend, log.Ldate|log.Ltime).Printf
+		return log.New(writer, prefix+": "+prepend, log.Ldate|log.Ltime|log.Lmicroseconds).Printf
 	}
 	if level >= LogLevelVerbose {
 		logger.Verbosef = logf("DEBUG")

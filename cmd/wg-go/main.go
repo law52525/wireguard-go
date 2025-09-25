@@ -35,6 +35,8 @@ func main() {
 		handleShowconf(args)
 	case "monitor":
 		handleMonitor(args)
+	case "dns":
+		handleDNS(args)
 	case "help", "--help", "-h":
 		printUsage()
 	default:
@@ -61,6 +63,7 @@ Commands:
     syncconf <interface> <file>     Synchronize configuration with file
     showconf <interface>            Show current configuration in config format
     monitor [interface] [interval]  Monitor interface status (live updates)
+    dns <interface> [show|interval] DNS monitoring management
 
 Examples:
     wg-go genkey                    Generate a private key
@@ -70,6 +73,8 @@ Examples:
     wg-go setconf wg0 wg0.conf      Apply configuration file to wg0
     wg-go monitor                   Monitor all interfaces (live)
     wg-go monitor utun2 10          Monitor utun2 every 10 seconds
+    wg-go dns wg0 show              Show DNS monitoring status for wg0
+    wg-go dns wg0 30                Set DNS monitoring interval to 30 seconds
 
 For more information, visit: https://www.wireguard.com/
 `)

@@ -20,11 +20,13 @@
 - **🔧 wg-go 管理工具**: 自制的 Go 版本 WireGuard 管理工具
 - **🚀 自动化脚本**: 一键启动和停止脚本
 - **🌐 智能域名解析**: 自动将域名解析为 IP 地址
+- **🔄 动态 DNS 监控**: 自动监控域名端点的 IP 变化并重新连接
 - **🔑 智能密钥转换**: Base64 ↔ Hex 格式自动转换
 - **📊 实时监控**: 连接状态和流量统计的实时监控
 
 ### 解决的问题
 1. **官方 wg 工具依赖**: 无需安装 wireguard-tools
+2. **动态 IP 问题**: 自动监控和处理域名端点的 IP 变化
 3. **域名解析**: 支持域名端点，自动解析为 IP
 4. **超时处理**: 防止命令挂起的智能超时
 5. **权限管理**: 友好的权限检查和提示
@@ -123,7 +125,8 @@ MTU = 1420
 
 [Peer]
 PublicKey = SERVER_PUBLIC_KEY
-# 支持域名，会自动解析为 IP
+# 支持域名，会自动解析为 IP 并监控 IP 变化
+# 当域名的 IP 地址变化时，会自动重新连接
 Endpoint = server.example.com:51820
 AllowedIPs = 192.168.11.0/24, 192.168.10.0/24
 PersistentKeepalive = 25
@@ -147,23 +150,23 @@ echo "公钥: $PUBLIC_KEY"
 sudo ./quick-start.sh
 
 # 手动启动
-sudo ./wireguard-go utun &
-sudo ./cmd/wg-go/wg-go setconf utun8 wg0.conf
-sudo ifconfig utun8 inet 192.168.11.35 192.168.11.35 netmask 255.255.255.255
-sudo route add -net 192.168.11.0/24 -interface utun8
-sudo route add -net 192.168.10.0/24 -interface utun8
+sudo ./wireguard-go utun11 &
+sudo ./cmd/wg-go/wg-go setconf utun11 wg0.conf
+sudo ifconfig utun11 inet 192.168.11.35 192.168.11.35 netmask 255.255.255.255
+sudo route add -net 192.168.11.0/24 -interface utun11
+sudo route add -net 192.168.10.0/24 -interface utun11
 ```
 
 ### 4. 验证连接
 ```bash
 # 查看连接状态
-sudo ./cmd/wg-go/wg-go show utun8
+sudo ./cmd/wg-go/wg-go show utun11
 
 # 测试网络连通性
 ping -c 3 192.168.11.21
 
 # 实时监控
-sudo ./cmd/wg-go/wg-go monitor utun8
+sudo ./cmd/wg-go/wg-go monitor utun11
 ```
 
 ### 5. 停止服务
@@ -206,23 +209,23 @@ PersistentKeepalive = 25                  # 可选: 保活间隔 (秒)
 #### 1. 接口配置
 ```bash
 # 配置 IP 地址 (point-to-point 接口需要相同的源和目标)
-sudo ifconfig utun8 inet LOCAL_IP LOCAL_IP netmask 255.255.255.255
+sudo ifconfig utun11 inet LOCAL_IP LOCAL_IP netmask 255.255.255.255
 
 # 查看接口状态
-ifconfig utun8
+ifconfig utun11
 ```
 
 #### 2. 路由配置
 ```bash
 # 添加到 VPN 网络的路由
-sudo route add -net NETWORK/CIDR -interface utun8
+sudo route add -net NETWORK/CIDR -interface utun11
 
 # 示例: 添加多个网络
-sudo route add -net 192.168.11.0/24 -interface utun8
-sudo route add -net 192.168.10.0/24 -interface utun8
+sudo route add -net 192.168.11.0/24 -interface utun11
+sudo route add -net 192.168.10.0/24 -interface utun11
 
 # 查看路由表
-netstat -rn | grep utun8
+netstat -rn | grep utun11
 ```
 
 #### 3. 全局 VPN (可选)
@@ -236,8 +239,8 @@ DEFAULT_GW=$(route -n get default | grep gateway | awk '{print $2}')
 sudo route add SERVER_IP $DEFAULT_GW
 
 # 设置 VPN 为默认路由
-sudo route add -net 0.0.0.0/1 -interface utun8
-sudo route add -net 128.0.0.0/1 -interface utun8
+sudo route add -net 0.0.0.0/1 -interface utun11
+sudo route add -net 128.0.0.0/1 -interface utun11
 ```
 
 ### 监控和调试
@@ -245,13 +248,13 @@ sudo route add -net 128.0.0.0/1 -interface utun8
 #### 1. 连接状态监控
 ```bash
 # 查看详细状态
-sudo ./cmd/wg-go/wg-go show utun8
+sudo ./cmd/wg-go/wg-go show utun11
 
 # 实时监控 (默认 5 秒间隔)
-sudo ./cmd/wg-go/wg-go monitor utun8
+sudo ./cmd/wg-go/wg-go monitor utun11
 
 # 自定义监控间隔
-sudo ./cmd/wg-go/wg-go monitor utun8 10
+sudo ./cmd/wg-go/wg-go monitor utun11 10
 
 # 监控所有接口
 sudo ./cmd/wg-go/wg-go monitor
@@ -272,10 +275,10 @@ nmap -sn 192.168.11.0/24
 #### 3. 流量统计
 ```bash
 # 查看数据传输统计
-sudo ./cmd/wg-go/wg-go show utun8 | grep "transfer"
+sudo ./cmd/wg-go/wg-go show utun11 | grep "transfer"
 
 # 实时流量监控
-watch -n 2 'sudo ./cmd/wg-go/wg-go show utun8 | grep transfer'
+watch -n 2 'sudo ./cmd/wg-go/wg-go show utun11 | grep transfer'
 ```
 
 ---
@@ -295,18 +298,25 @@ echo "PRIVATE_KEY" | ./cmd/wg-go/wg-go pubkey        # 从私钥生成公钥
 #### 配置管理
 ```bash
 sudo ./cmd/wg-go/wg-go show                 # 显示所有接口
-sudo ./cmd/wg-go/wg-go show utun8           # 显示特定接口
-sudo ./cmd/wg-go/wg-go setconf utun8 wg0.conf      # 应用配置文件
-sudo ./cmd/wg-go/wg-go showconf utun8       # 显示配置格式
-sudo ./cmd/wg-go/wg-go addconf utun8 peer.conf     # 添加 peer
-sudo ./cmd/wg-go/wg-go syncconf utun8 wg0.conf     # 同步配置
+sudo ./cmd/wg-go/wg-go show utun11           # 显示特定接口
+sudo ./cmd/wg-go/wg-go setconf utun11 wg0.conf      # 应用配置文件
+sudo ./cmd/wg-go/wg-go showconf utun11       # 显示配置格式
+sudo ./cmd/wg-go/wg-go addconf utun11 peer.conf     # 添加 peer
+sudo ./cmd/wg-go/wg-go syncconf utun11 wg0.conf     # 同步配置
 ```
 
 #### 监控功能
 ```bash
 sudo ./cmd/wg-go/wg-go monitor              # 监控所有接口
-sudo ./cmd/wg-go/wg-go monitor utun8        # 监控特定接口
-sudo ./cmd/wg-go/wg-go monitor utun8 10     # 自定义更新间隔
+sudo ./cmd/wg-go/wg-go monitor utun11        # 监控特定接口
+sudo ./cmd/wg-go/wg-go monitor utun11 10     # 自定义更新间隔
+```
+
+#### DNS 监控管理 (新功能)
+```bash
+sudo ./cmd/wg-go/wg-go dns utun11 show       # 显示 DNS 监控状态
+sudo ./cmd/wg-go/wg-go dns utun11 30         # 设置监控间隔为 30 秒
+sudo ./cmd/wg-go/wg-go dns utun11 60         # 设置监控间隔为 60 秒
 ```
 
 ### 自动化脚本
@@ -342,15 +352,15 @@ sudo pkill wireguard-go                     # 停止 WireGuard
 
 #### 网络诊断
 ```bash
-ifconfig utun8                              # 查看接口状态
-netstat -rn | grep utun8                    # 查看路由
+ifconfig utun11                              # 查看接口状态
+netstat -rn | grep utun11                    # 查看路由
 lsof -i :51820                              # 查看端口占用
 ```
 
 #### Socket 管理
 ```bash
 ls -la /var/run/wireguard/                  # 查看 socket 文件
-sudo rm /var/run/wireguard/utun8.sock       # 清理 socket 文件
+sudo rm /var/run/wireguard/utun11.sock       # 清理 socket 文件
 ```
 
 ---
@@ -364,7 +374,7 @@ sudo rm /var/run/wireguard/utun8.sock       # 清理 socket 文件
 # 问题: permission denied
 # 原因: 没有使用 sudo
 # 解决: 确保使用 sudo 运行需要管理员权限的命令
-sudo ./cmd/wg-go/wg-go show utun8
+sudo ./cmd/wg-go/wg-go show utun11
 sudo ./quick-start.sh
 ```
 
@@ -390,7 +400,7 @@ nc -u -v SERVER_IP SERVER_PORT
 
 # 检查: 配置文件
 cat wg0.conf
-sudo ./cmd/wg-go/wg-go show utun8
+sudo ./cmd/wg-go/wg-go show utun11
 ```
 
 #### 4. 域名解析问题
@@ -410,7 +420,7 @@ nslookup SERVER_DOMAIN
 netstat -rn | grep 192.168.1
 
 # 修复: 重新添加路由
-sudo route add -net 192.168.11.0/24 -interface utun8
+sudo route add -net 192.168.11.0/24 -interface utun11
 ```
 
 ### 调试技巧
@@ -425,7 +435,7 @@ sudo log show --predicate 'process CONTAINS "wireguard"' --last 5m
 #### 2. 网络抓包
 ```bash
 # 抓取 WireGuard 流量 (需要安装 tcpdump)
-sudo tcpdump -i utun8
+sudo tcpdump -i utun11
 sudo tcpdump -i any port 51820
 ```
 
@@ -435,13 +445,13 @@ sudo tcpdump -i any port 51820
 ps aux | grep wireguard
 
 # 2. 检查接口
-ifconfig utun8
+ifconfig utun11
 
 # 3. 检查配置
-sudo ./cmd/wg-go/wg-go show utun8
+sudo ./cmd/wg-go/wg-go show utun11
 
 # 4. 检查路由
-netstat -rn | grep utun8
+netstat -rn | grep utun11
 
 # 5. 测试连通性
 ping -c 1 192.168.11.21
@@ -462,6 +472,13 @@ ping -c 1 192.168.11.21
 - **功能**: 自动将域名端点解析为 IP 地址
 - **实现**: 在发送 UAPI 命令前预解析域名
 - **代码位置**: `cmd/wg-go/uapi.go` 中的 `resolveEndpoint` 函数
+
+#### 2.5. 动态 DNS 监控 (新功能)
+- **功能**: 自动监控域名端点的 IP 变化，当检测到变化时自动重新连接
+- **实现**: 后台定期解析域名，比较 IP 变化，自动更新端点并发起新握手
+- **代码位置**: `device/dns_monitor.go` 和相关 UAPI 集成
+- **监控间隔**: 默认 60 秒，可通过命令行配置 (最小 10 秒)
+- **支持场景**: 动态 DNS 服务、云服务器重启、ISP 动态 IP 等
 
 #### 3. 密钥格式转换
 - **问题**: WireGuard UAPI 需要 hex 格式，但配置文件使用 base64
@@ -504,7 +521,7 @@ ping -c 1 192.168.11.21
 ┌─────────────────────────────────────────────────────────────┐
 │                      macOS 网络栈                            │
 ├─────────────────────────────────────────────────────────────┤
-│ utun8 接口     │ 虚拟网络接口                                 │
+│ utun11 接口     │ 虚拟网络接口                                 │
 │ 路由表         │ 网络路由管理                                 │
 │ 防火墙         │ 网络安全策略                                 │
 └─────────────────────────────────────────────────────────────┘
@@ -553,6 +570,5 @@ ping -c 1 192.168.11.21
 ---
 
 **需要帮助？** 
-- 查看 [COMPLETE_GUIDE.md](COMPLETE_GUIDE.md) 获取更多技术细节
 - 运行 `./cmd/wg-go/wg-go help` 查看命令帮助
 - 使用 `sudo ./quick-start.sh` 快速开始

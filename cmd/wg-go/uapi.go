@@ -321,14 +321,24 @@ func setInterfaceConfig(interfaceName string, config *Config) error {
 		}
 
 		if peer.Endpoint != "" {
-			// Resolve domain names to IP addresses for UAPI
-			resolvedEndpoint, err := resolveEndpoint(peer.Endpoint)
-			if err != nil {
-				fmt.Printf("⚠️  Warning: Failed to resolve endpoint %s: %v\n", peer.Endpoint, err)
-				fmt.Printf("   Trying to use original endpoint anyway...\n")
-				resolvedEndpoint = peer.Endpoint
+			// Check if endpoint is a domain name
+			host, _, err := net.SplitHostPort(peer.Endpoint)
+			if err == nil && net.ParseIP(host) == nil {
+				// This is a domain name - send original endpoint for DNS monitoring
+				fmt.Printf("🔍 Domain endpoint detected: %s (will be monitored for IP changes)\n", peer.Endpoint)
+				configStr.WriteString(fmt.Sprintf("endpoint=%s\n", peer.Endpoint))
+			} else {
+				// This is an IP address or invalid format - resolve it for compatibility
+				resolvedEndpoint, err := resolveEndpoint(peer.Endpoint)
+				if err != nil {
+					fmt.Printf("⚠️  Warning: Failed to resolve endpoint %s: %v\n", peer.Endpoint, err)
+					fmt.Printf("   Trying to use original endpoint anyway...\n")
+					resolvedEndpoint = peer.Endpoint
+				} else {
+					fmt.Printf("✅ Resolved %s -> %s\n", peer.Endpoint, resolvedEndpoint)
+				}
+				configStr.WriteString(fmt.Sprintf("endpoint=%s\n", resolvedEndpoint))
 			}
-			configStr.WriteString(fmt.Sprintf("endpoint=%s\n", resolvedEndpoint))
 		}
 
 		if peer.PersistentKeepalive > 0 {

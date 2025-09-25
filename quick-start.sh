@@ -88,30 +88,51 @@ stop_existing() {
 start_daemon() {
     print_step "3. 启动 WireGuard 守护进程"
     
-    print_info "启动 wireguard-go..."
-    ./wireguard-go utun &
+    print_info "启动 wireguard-go (启用详细日志)..."
+    print_info "日志文件: $(pwd)/wireguard-go.log"
+    print_info "日志仅写入文件，不会污染控制台输出"
+    LOG_LEVEL=verbose LOG_FILE_ONLY=true ./wireguard-go utun11 &
     WG_PID=$!
     
     print_info "等待接口创建..."
     sleep 3
     
-    if [[ ! -S "/var/run/wireguard/utun8.sock" ]]; then
-        print_error "WireGuard 接口创建失败"
+    # 检查 utun11 接口是否创建成功
+    if [[ ! -S "/var/run/wireguard/utun11.sock" ]]; then
+        print_error "WireGuard 接口 utun11 创建失败"
+        print_info "正在检查可能的原因..."
+        
+        # 检查进程是否还在运行
+        if ! kill -0 $WG_PID 2>/dev/null; then
+            print_error "WireGuard 进程已退出"
+            print_info "可能的原因："
+            print_info "  - utun11 接口已被占用"
+            print_info "  - 权限不足"
+            print_info "  - 系统不支持指定的接口名"
+        else
+            print_error "进程运行中但接口未创建"
+        fi
+        
+        # 检查是否有其他 utun socket 被创建
+        print_info "检查已创建的 WireGuard 接口:"
+        ls -la /var/run/wireguard/ 2>/dev/null || print_info "  没有找到 WireGuard socket 文件"
+        
         exit 1
     fi
     
     print_success "WireGuard 守护进程启动成功 (PID: $WG_PID)"
+    print_success "接口 utun11 创建成功"
 }
 
 # 应用配置
 apply_config() {
     print_step "4. 应用配置文件"
     
-    print_info "应用 wg0.conf 到 utun8..."
-    ./cmd/wg-go/wg-go setconf utun8 wg0.conf
+    print_info "应用 wg0.conf 到 utun11..."
+    ./cmd/wg-go/wg-go setconf utun11 wg0.conf
     
     print_info "检查配置应用结果..."
-    CONFIG_OUTPUT=$(./cmd/wg-go/wg-go show utun8)
+    CONFIG_OUTPUT=$(./cmd/wg-go/wg-go show utun11)
     
     if echo "$CONFIG_OUTPUT" | grep -q "latest handshake"; then
         print_success "配置应用成功，握手已建立"
@@ -133,7 +154,7 @@ setup_network() {
     fi
     
     print_info "配置接口 IP: $VPN_IP"
-    ifconfig utun8 inet "$VPN_IP" "$VPN_IP" netmask 255.255.255.255
+    ifconfig utun11 inet "$VPN_IP" "$VPN_IP" netmask 255.255.255.255
     
     print_info "添加路由..."
     # 从 AllowedIPs 提取网络段
@@ -144,7 +165,7 @@ setup_network() {
         network=$(echo "$network" | tr -d ' ')
         if [[ "$network" =~ ^192\.168\. ]]; then
             print_info "添加路由: $network"
-            route add -net "$network" -interface utun8
+            route add -net "$network" -interface utun11
         fi
     done
     
@@ -156,15 +177,15 @@ verify_connection() {
     print_step "6. 验证连接"
     
     print_info "检查接口状态..."
-    INTERFACE_STATUS=$(ifconfig utun8)
+    INTERFACE_STATUS=$(ifconfig utun11)
     echo "$INTERFACE_STATUS"
     
     print_info "检查 WireGuard 状态..."
-    WG_STATUS=$(./cmd/wg-go/wg-go show utun8)
+    WG_STATUS=$(./cmd/wg-go/wg-go show utun11)
     echo "$WG_STATUS"
     
     print_info "检查路由..."
-    netstat -rn | grep utun8
+    netstat -rn | grep utun11
     
     # 尝试 ping 测试
     print_info "测试网络连通性..."
@@ -185,25 +206,45 @@ show_status() {
     
     echo
     echo "🔗 WireGuard 连接信息:"
-    ./cmd/wg-go/wg-go show utun8
+    ./cmd/wg-go/wg-go show utun11
     
     echo
     echo "🌐 网络接口:"
-    ifconfig utun8 | head -2
+    ifconfig utun11 | head -2
     
     echo
     echo "🛣️  相关路由:"
-    netstat -rn | grep utun8
+    netstat -rn | grep utun11
+    
+    echo
+    echo "🔄 DNS 监控状态:"
+    ./cmd/wg-go/wg-go dns utun11 2>/dev/null || echo "  DNS 监控功能需要增强版 wireguard-go"
+    
+    echo
+    echo "📋 日志文件:"
+    echo "  位置: $(pwd)/wireguard-go.log"
+    if [ -f "wireguard-go.log" ]; then
+        echo "  大小: $(ls -lh wireguard-go.log | awk '{print $5}')"
+        echo "  最新一条: $(tail -1 wireguard-go.log 2>/dev/null || echo 'N/A')"
+    fi
     
     echo
     print_success "WireGuard 启动完成！"
     echo
     echo "📋 常用命令:"
-    echo "  查看状态: sudo ./cmd/wg-go/wg-go show utun8"
-    echo "  实时监控: sudo ./cmd/wg-go/wg-go monitor utun8"
+    echo "  查看状态: sudo ./cmd/wg-go/wg-go show utun11"
+    echo "  实时监控: sudo ./cmd/wg-go/wg-go monitor utun11"
+    echo "  DNS 监控状态: sudo ./cmd/wg-go/wg-go dns utun11"
+    echo "  设置 DNS 监控: sudo ./cmd/wg-go/wg-go dns utun11 <间隔秒数>"
+    echo
+    echo "📋 日志查看:"
+    echo "  实时日志: tail -f wireguard-go.log"
+    echo "  DNS 日志: grep 'DNS Monitor' wireguard-go.log"
+    echo "  最新日志: tail -20 wireguard-go.log"
+    echo
     echo "  停止服务: sudo pkill wireguard-go"
     echo
-    echo "📖 详细文档: 查看 COMPLETE_GUIDE.md"
+    echo "📖 详细文档: 查看 WIREGUARD_GO_GUIDE.md"
 }
 
 # 主函数

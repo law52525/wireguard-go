@@ -9,8 +9,11 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strconv"
 
@@ -140,9 +143,46 @@ func main() {
 		}
 	}
 
-	logger := device.NewLogger(
+	// Setup log file if specified
+	var logWriter io.Writer = os.Stderr
+	logFile := os.Getenv("LOG_FILE")
+	if logFile == "" {
+		// Default log file in current directory
+		logFile = "wireguard-go.log"
+	}
+
+	// Check if we should log only to file (not to console)
+	logFileOnly := os.Getenv("LOG_FILE_ONLY") == "true"
+
+	// Create log file
+	if logFile != "" && logFile != "-" {
+		// Ensure directory exists
+		logDir := filepath.Dir(logFile)
+		if logDir != "." {
+			os.MkdirAll(logDir, 0755)
+		}
+
+		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			log.Printf("Failed to open log file %s: %v, using stderr", logFile, err)
+			logWriter = os.Stderr
+		} else {
+			if logFileOnly {
+				// Only write to file, not to console
+				logWriter = file
+				fmt.Fprintf(os.Stderr, "Logging to file only: %s\n", logFile)
+			} else {
+				// Use both file and stderr for logging
+				logWriter = io.MultiWriter(os.Stderr, file)
+				fmt.Fprintf(os.Stderr, "Logging to file: %s\n", logFile)
+			}
+		}
+	}
+
+	logger := device.NewLoggerWithWriter(
 		logLevel,
 		fmt.Sprintf("(%s) ", interfaceName),
+		logWriter,
 	)
 
 	logger.Verbosef("Starting wireguard-go version %s", Version)

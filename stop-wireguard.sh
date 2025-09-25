@@ -75,12 +75,12 @@ stop_wireguard() {
 check_interfaces() {
     print_step "2. 检查网络接口状态"
     
-    if ifconfig utun8 >/dev/null 2>&1; then
-        print_info "utun8 接口仍然存在:"
-        ifconfig utun8 | head -2
+    if ifconfig utun11 >/dev/null 2>&1; then
+        print_info "utun11 接口仍然存在:"
+        ifconfig utun11 | head -2
         print_info "接口通常会在进程停止后自动消失"
     else
-        print_success "utun8 接口已清理"
+        print_success "utun11 接口已清理"
     fi
     
     # 显示剩余的 utun 接口
@@ -159,10 +159,10 @@ verify_cleanup() {
     fi
     
     # 检查接口
-    if ifconfig utun8 >/dev/null 2>&1; then
-        print_info "⚠️  utun8 接口仍然存在"
+    if ifconfig utun11 >/dev/null 2>&1; then
+        print_info "⚠️  utun11 接口仍然存在"
     else
-        print_success "✅ utun8 接口已清理"
+        print_success "✅ utun11 接口已清理"
     fi
     
     # 检查路由

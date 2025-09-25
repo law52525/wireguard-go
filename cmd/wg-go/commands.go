@@ -449,3 +449,153 @@ func parsePeerOption(peer *PeerConfig, key, value string) error {
 	}
 	return nil
 }
+
+// Handle 'dns' command - manage DNS monitoring settings
+func handleDNS(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, "Error: DNS command requires interface name\n")
+		fmt.Fprintf(os.Stderr, "Usage: wg-go dns <interface> [show|interval_seconds]\n")
+		os.Exit(1)
+	}
+
+	interfaceName := args[0]
+
+	// Connect to the interface via UAPI
+	conn, err := connectToInterface(interfaceName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error connecting to interface '%s': %v\n", interfaceName, err)
+		os.Exit(1)
+	}
+	defer conn.Close()
+
+	if len(args) == 1 || (len(args) == 2 && args[1] == "show") {
+		// Show current DNS monitoring status
+		showDNSMonitoringStatus(conn, interfaceName)
+	} else if len(args) == 2 {
+		// Set DNS monitoring interval
+		intervalStr := args[1]
+		interval, err := strconv.Atoi(intervalStr)
+		if err != nil || interval <= 0 {
+			fmt.Fprintf(os.Stderr, "Error: Invalid interval '%s'. Must be a positive number of seconds.\n", intervalStr)
+			os.Exit(1)
+		}
+
+		setDNSMonitoringInterval(conn, interfaceName, interval)
+	} else {
+		fmt.Fprintf(os.Stderr, "Error: Too many arguments for DNS command\n")
+		fmt.Fprintf(os.Stderr, "Usage: wg-go dns <interface> [show|interval_seconds]\n")
+		os.Exit(1)
+	}
+}
+
+// Show DNS monitoring status for an interface
+func showDNSMonitoringStatus(conn net.Conn, interfaceName string) {
+	fmt.Printf("DNS Monitoring Status for %s:\n", interfaceName)
+	fmt.Println(strings.Repeat("=", 40))
+
+	// Request interface status via UAPI
+	_, err := fmt.Fprintf(conn, "get=1\n\n")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error requesting status: %v\n", err)
+		return
+	}
+
+	// Parse response
+	scanner := bufio.NewScanner(conn)
+	var dnsInterval, monitoredPeers int
+	var hasDNSInfo bool
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			break // End of response
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key, value := parts[0], parts[1]
+		switch key {
+		case "dns_monitor_interval":
+			if interval, err := strconv.Atoi(value); err == nil {
+				dnsInterval = interval
+				hasDNSInfo = true
+			}
+		case "dns_monitored_peers":
+			if peers, err := strconv.Atoi(value); err == nil {
+				monitoredPeers = peers
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		return
+	}
+
+	if !hasDNSInfo {
+		fmt.Printf("❌ DNS monitoring is not available for this interface\n")
+		fmt.Printf("   This may be because the interface is not running or\n")
+		fmt.Printf("   DNS monitoring is not enabled.\n")
+		return
+	}
+
+	// Display DNS monitoring information
+	fmt.Printf("✅ DNS monitoring is active\n")
+	fmt.Printf("📅 Check interval: %d seconds\n", dnsInterval)
+	fmt.Printf("👥 Monitored peers: %d\n", monitoredPeers)
+
+	if monitoredPeers == 0 {
+		fmt.Printf("\n💡 No peers with domain endpoints are currently configured.\n")
+		fmt.Printf("   To monitor domain endpoints, add peers with domain names like:\n")
+		fmt.Printf("   Endpoint = vpn.example.com:51820\n")
+	} else {
+		fmt.Printf("\n🔍 Monitoring %d peer(s) with domain-based endpoints\n", monitoredPeers)
+	}
+
+	fmt.Printf("\n📊 For detailed monitoring, use: wg-go monitor %s\n", interfaceName)
+}
+
+// Set DNS monitoring interval
+func setDNSMonitoringInterval(conn net.Conn, interfaceName string, intervalSeconds int) {
+	fmt.Printf("Setting DNS monitoring interval for %s to %d seconds...\n", interfaceName, intervalSeconds)
+
+	// Send UAPI command to set DNS monitoring interval
+	_, err := fmt.Fprintf(conn, "set=1\ndns_monitor_interval=%d\n\n", intervalSeconds)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error sending configuration: %v\n", err)
+		return
+	}
+
+	// Read response
+	scanner := bufio.NewScanner(conn)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "errno=") {
+			errno := strings.TrimPrefix(line, "errno=")
+			if errno != "0" {
+				if errno == "-22" {
+					fmt.Fprintf(os.Stderr, "❌ DNS monitoring not supported: This interface was not created with DNS monitoring support.\n")
+					fmt.Fprintf(os.Stderr, "   The interface may have been created by a different WireGuard implementation\n")
+					fmt.Fprintf(os.Stderr, "   that doesn't include dynamic DNS functionality.\n")
+					fmt.Fprintf(os.Stderr, "\n💡 To use DNS monitoring:\n")
+					fmt.Fprintf(os.Stderr, "   1. Stop the current interface\n")
+					fmt.Fprintf(os.Stderr, "   2. Create a new interface with this enhanced wg-go version\n")
+				} else {
+					fmt.Fprintf(os.Stderr, "Error setting DNS monitoring interval: errno=%s\n", errno)
+				}
+				return
+			}
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ DNS monitoring interval successfully set to %d seconds\n", intervalSeconds)
+}

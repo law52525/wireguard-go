@@ -8,6 +8,7 @@ package device
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -95,6 +96,16 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 
 		if device.net.fwmark != 0 {
 			sendf("fwmark=%d", device.net.fwmark)
+		}
+
+		// Output DNS monitoring information
+		if device.dnsMonitor != nil {
+			sendf("dns_monitor_interval=%d", int(device.dnsMonitor.GetMonitorInterval().Seconds()))
+
+			monitoredPeers := device.dnsMonitor.GetMonitoredPeers()
+			if len(monitoredPeers) > 0 {
+				sendf("dns_monitored_peers=%d", len(monitoredPeers))
+			}
 		}
 
 		for _, peer := range device.peers.keyMap {
@@ -204,6 +215,21 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		}
 		device.log.Verbosef("UAPI: Updating private key")
 		device.SetPrivateKey(sk)
+
+	case "dns_monitor_interval":
+		// Set DNS monitoring interval in seconds
+		interval, err := strconv.ParseUint(value, 10, 32)
+		if err != nil {
+			return ipcErrorf(ipc.IpcErrorInvalid, "invalid DNS monitor interval: %w", err)
+		}
+
+		intervalDuration := time.Duration(interval) * time.Second
+		if intervalDuration < 10*time.Second {
+			return ipcErrorf(ipc.IpcErrorInvalid, "DNS monitor interval must be at least 10 seconds")
+		}
+
+		device.SetDNSMonitorInterval(intervalDuration)
+		device.log.Verbosef("UAPI: DNS monitor interval set to %d seconds", interval)
 
 	case "listen_port":
 		port, err := strconv.ParseUint(value, 10, 16)
@@ -339,13 +365,67 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 
 	case "endpoint":
 		device.log.Verbosef("%v - UAPI: Updating endpoint", peer.Peer)
-		endpoint, err := device.net.bind.ParseEndpoint(value)
+
+		var endpointValue = value
+		var isDomain = false
+
+		// Check if this is a domain-based endpoint
+		if IsDomainEndpoint(value) {
+			isDomain = true
+			device.log.Verbosef("%v - UAPI: Domain endpoint detected: %s", peer.Peer, value)
+
+			// Resolve domain to IP for bind layer
+			host, port, err := net.SplitHostPort(value)
+			if err != nil {
+				return ipcErrorf(ipc.IpcErrorInvalid, "invalid endpoint format %v: %w", value, err)
+			}
+
+			// Resolve domain name
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			ips, err := net.DefaultResolver.LookupHost(ctx, host)
+			if err != nil {
+				return ipcErrorf(ipc.IpcErrorInvalid, "failed to resolve domain %v: %w", host, err)
+			}
+
+			if len(ips) == 0 {
+				return ipcErrorf(ipc.IpcErrorInvalid, "no IP addresses found for domain %v", host)
+			}
+
+			// Prefer IPv4
+			var selectedIP string
+			for _, ip := range ips {
+				if net.ParseIP(ip).To4() != nil {
+					selectedIP = ip
+					break
+				}
+			}
+			if selectedIP == "" {
+				selectedIP = ips[0]
+			}
+
+			endpointValue = net.JoinHostPort(selectedIP, port)
+			device.log.Verbosef("%v - UAPI: Resolved %s to %s for bind layer", peer.Peer, value, endpointValue)
+		}
+
+		endpoint, err := device.net.bind.ParseEndpoint(endpointValue)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set endpoint %v: %w", value, err)
+			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set endpoint %v: %w", endpointValue, err)
 		}
 		peer.endpoint.Lock()
 		defer peer.endpoint.Unlock()
 		peer.endpoint.val = endpoint
+
+		// If this is a domain-based endpoint, add it to DNS monitoring
+		if isDomain && device.dnsMonitor != nil {
+			err := device.dnsMonitor.AddPeer(peer.handshake.remoteStatic, value)
+			if err != nil {
+				device.log.Verbosef("%v - UAPI: Failed to add domain endpoint to DNS monitor: %v", peer.Peer, err)
+			} else {
+				device.log.Verbosef("%v - UAPI: Added domain endpoint %s to DNS monitor", peer.Peer, value)
+			}
+		}
 
 	case "persistent_keepalive_interval":
 		device.log.Verbosef("%v - UAPI: Updating persistent keepalive interval", peer.Peer)

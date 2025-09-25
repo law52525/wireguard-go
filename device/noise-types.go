@@ -73,6 +73,10 @@ func (key NoisePublicKey) Equals(tar NoisePublicKey) bool {
 	return subtle.ConstantTimeCompare(key[:], tar[:]) == 1
 }
 
+func (key NoisePublicKey) Hex() string {
+	return hex.EncodeToString(key[:])
+}
+
 func (key *NoisePresharedKey) FromHex(src string) error {
 	return loadExactHex(key[:], src)
 }
