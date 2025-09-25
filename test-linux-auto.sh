@@ -4,7 +4,7 @@
 # Automated Linux Testing Script for WireGuard-Go
 
 # set -e
-
+export PATH=$PATH:/usr/local/go/bin
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
