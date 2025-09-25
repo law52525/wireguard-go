@@ -27,7 +27,17 @@
 # 1. 安装 Go (如果未安装)
 wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz
-export PATH=$PATH:/usr/local/go/bin
+
+# 永久添加 Go 到 PATH（选择其中一种方法）
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+source ~/.bashrc
+
+# 或者添加到 ~/.profile（对所有 shell 生效）
+# echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
+# source ~/.profile
+
+# 验证安装
+go version
 
 # 2. 克隆项目
 git clone <your-wireguard-go-repo>
