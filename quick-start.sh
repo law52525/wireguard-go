@@ -55,9 +55,18 @@ check_files() {
         exit 1
     fi
     
-    if [[ ! -f "cmd/wg-go/wg-go" ]]; then
+    # 检查 wg-go 工具是否存在
+    WG_GO_PATH=""
+    if [[ -f "cmd/wg-go/wg-go" ]]; then
+        WG_GO_PATH="cmd/wg-go/wg-go"
+        print_info "找到 wg-go 工具: cmd/wg-go/wg-go"
+    elif [[ -f "wg-go" ]]; then
+        WG_GO_PATH="wg-go"
+        print_info "找到 wg-go 工具: wg-go"
+    else
         print_error "wg-go 工具不存在，请先编译"
         echo "运行: cd cmd/wg-go && go build -o wg-go"
+        echo "或者: go build -o wg-go"
         exit 1
     fi
     
@@ -92,7 +101,6 @@ start_daemon() {
     print_info "日志文件: $(pwd)/wireguard-go.log"
     print_info "日志仅写入文件，不会污染控制台输出"
     ./wireguard-go utun11 &
-    WG_PID=$!
     
     print_info "等待接口创建..."
     sleep 3
@@ -102,16 +110,16 @@ start_daemon() {
         print_error "WireGuard 接口 utun11 创建失败"
         print_info "正在检查可能的原因..."
         
-        # 检查进程是否还在运行
-        if ! kill -0 $WG_PID 2>/dev/null; then
-            print_error "WireGuard 进程已退出"
-            print_info "可能的原因："
-            print_info "  - utun11 接口已被占用"
-            print_info "  - 权限不足"
-            print_info "  - 系统不支持指定的接口名"
-        else
-            print_error "进程运行中但接口未创建"
-        fi
+    # 检查进程是否还在运行
+    if ! pgrep -l wireguard-go >/dev/null 2>&1; then
+        print_error "WireGuard 进程已退出"
+        print_info "可能的原因："
+        print_info "  - utun11 接口已被占用"
+        print_info "  - 权限不足"
+        print_info "  - 系统不支持指定的接口名"
+    else
+        print_error "进程运行中但接口未创建"
+    fi
         
         # 检查是否有其他 utun socket 被创建
         print_info "检查已创建的 WireGuard 接口:"
@@ -120,7 +128,7 @@ start_daemon() {
         exit 1
     fi
     
-    print_success "WireGuard 守护进程启动成功 (PID: $WG_PID)"
+    print_success "WireGuard 守护进程启动成功"
     print_success "接口 utun11 创建成功"
 }
 
@@ -129,10 +137,10 @@ apply_config() {
     print_step "4. 应用配置文件"
     
     print_info "应用 wg0.conf 到 utun11..."
-    ./cmd/wg-go/wg-go setconf utun11 wg0.conf
+    ./$WG_GO_PATH setconf utun11 wg0.conf
     
     print_info "检查配置应用结果..."
-    CONFIG_OUTPUT=$(./cmd/wg-go/wg-go show utun11)
+    CONFIG_OUTPUT=$(./$WG_GO_PATH show utun11)
     
     if echo "$CONFIG_OUTPUT" | grep -q "latest handshake"; then
         print_success "配置应用成功，握手已建立"
@@ -181,7 +189,7 @@ verify_connection() {
     echo "$INTERFACE_STATUS"
     
     print_info "检查 WireGuard 状态..."
-    WG_STATUS=$(./cmd/wg-go/wg-go show utun11)
+    WG_STATUS=$(./$WG_GO_PATH show utun11)
     echo "$WG_STATUS"
     
     print_info "检查路由..."
@@ -206,7 +214,7 @@ show_status() {
     
     echo
     echo "🔗 WireGuard 连接信息:"
-    ./cmd/wg-go/wg-go show utun11
+    ./$WG_GO_PATH show utun11
     
     echo
     echo "🌐 网络接口:"
@@ -218,7 +226,7 @@ show_status() {
     
     echo
     echo "🔄 DNS 监控状态:"
-    ./cmd/wg-go/wg-go dns utun11 2>/dev/null || echo "  DNS 监控功能需要增强版 wireguard-go"
+    ./$WG_GO_PATH dns utun11 2>/dev/null || echo "  DNS 监控功能需要增强版 wireguard-go"
     
     echo
     echo "📋 日志文件:"
@@ -232,10 +240,10 @@ show_status() {
     print_success "WireGuard 启动完成！"
     echo
     echo "📋 常用命令:"
-    echo "  查看状态: sudo ./cmd/wg-go/wg-go show utun11"
-    echo "  实时监控: sudo ./cmd/wg-go/wg-go monitor utun11"
-    echo "  DNS 监控状态: sudo ./cmd/wg-go/wg-go dns utun11"
-    echo "  设置 DNS 监控: sudo ./cmd/wg-go/wg-go dns utun11 <间隔秒数>"
+    echo "  查看状态: sudo ./$WG_GO_PATH show utun11"
+    echo "  实时监控: sudo ./$WG_GO_PATH monitor utun11"
+    echo "  DNS 监控状态: sudo ./$WG_GO_PATH dns utun11"
+    echo "  设置 DNS 监控: sudo ./$WG_GO_PATH dns utun11 <间隔秒数>"
     echo
     echo "📋 日志查看:"
     echo "  实时日志: tail -f wireguard-go.log"

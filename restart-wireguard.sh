@@ -82,14 +82,28 @@ stop_wireguard() {
     fi
 }
 
-# 启动 WireGuard
-start_wireguard() {
-    print_step "2. 启动 WireGuard 守护进程"
+# 检查必要文件
+check_files() {
+    print_step "2. 检查必要文件"
     
-    # 检查必要文件
     if [ ! -f "./wireguard-go" ]; then
         print_error "wireguard-go 可执行文件不存在"
         echo "请先运行: go build -o wireguard-go ."
+        exit 1
+    fi
+    
+    # 检查 wg-go 工具是否存在
+    WG_GO_PATH=""
+    if [[ -f "cmd/wg-go/wg-go" ]]; then
+        WG_GO_PATH="cmd/wg-go/wg-go"
+        print_info "找到 wg-go 工具: cmd/wg-go/wg-go"
+    elif [[ -f "wg-go" ]]; then
+        WG_GO_PATH="wg-go"
+        print_info "找到 wg-go 工具: wg-go"
+    else
+        print_error "wg-go 工具不存在，请先编译"
+        echo "运行: cd cmd/wg-go && go build -o wg-go"
+        echo "或者: go build -o wg-go"
         exit 1
     fi
     
@@ -99,24 +113,30 @@ start_wireguard() {
         exit 1
     fi
     
+    print_success "所有必要文件存在"
+}
+
+# 启动 WireGuard
+start_wireguard() {
+    print_step "3. 启动 WireGuard 守护进程"
+    
     print_info "启动 wireguard-go (日志仅写入文件)..."
     print_info "日志文件: $(pwd)/wireguard-go.log"
     
     # 启动守护进程
     ./wireguard-go utun11 &
-    WG_PID=$!
     
     print_info "等待接口创建..."
     sleep 3
     
     # 检查进程是否正常运行
-    if ! kill -0 $WG_PID 2>/dev/null; then
+    if ! pgrep -l wireguard-go >/dev/null 2>&1; then
         print_error "WireGuard 守护进程启动失败"
         echo "请检查日志文件: wireguard-go.log"
         exit 1
     fi
     
-    print_success "WireGuard 守护进程已启动 (PID: $WG_PID)"
+    print_success "WireGuard 守护进程已启动"
 }
 
 # 配置网络
@@ -138,7 +158,7 @@ apply_config() {
     print_step "4. 应用 WireGuard 配置"
     
     print_info "应用 wg0.conf 到 utun11..."
-    ./cmd/wg-go/wg-go setconf utun11 wg0.conf
+    ./$WG_GO_PATH setconf utun11 wg0.conf
     
     print_info "等待握手建立..."
     sleep 2
@@ -159,7 +179,7 @@ verify_connection() {
     
     # 检查 WireGuard 状态
     print_info "检查 WireGuard 状态..."
-    if ! ./cmd/wg-go/wg-go show utun11 >/dev/null 2>&1; then
+    if ! ./$WG_GO_PATH show utun11 >/dev/null 2>&1; then
         print_error "WireGuard 状态异常"
         exit 1
     fi
@@ -181,11 +201,11 @@ show_status() {
     
     echo
     echo "🔗 WireGuard 连接信息:"
-    ./cmd/wg-go/wg-go show utun11
+    ./$WG_GO_PATH show utun11
     
     echo
     echo "📊 DNS 监控状态:"
-    ./cmd/wg-go/wg-go dns utun11 2>/dev/null || echo "  DNS 监控功能需要增强版 wireguard-go"
+    ./$WG_GO_PATH dns utun11 2>/dev/null || echo "  DNS 监控功能需要增强版 wireguard-go"
     
     echo
     echo "📋 日志文件:"
@@ -199,8 +219,8 @@ show_status() {
     echo "📋 实用命令:"
     echo "  实时日志: tail -f wireguard-go.log"
     echo "  DNS 日志: grep 'DNS Monitor' wireguard-go.log"
-    echo "  查看状态: sudo ./cmd/wg-go/wg-go show utun11"
-    echo "  实时监控: sudo ./cmd/wg-go/wg-go monitor utun11"
+    echo "  查看状态: sudo ./$WG_GO_PATH show utun11"
+    echo "  实时监控: sudo ./$WG_GO_PATH monitor utun11"
     echo "  停止服务: sudo pkill wireguard-go"
 }
 
@@ -209,6 +229,7 @@ main() {
     print_header
     
     check_permissions
+    check_files
     stop_wireguard
     start_wireguard
     configure_network
