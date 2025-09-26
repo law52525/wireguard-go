@@ -98,7 +98,7 @@ func main() {
 		foreground = os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1"
 	}
 
-	// get log level (default: info)
+	// get log level (default: debug/verbose)
 
 	logLevel := func() int {
 		switch os.Getenv("LOG_LEVEL") {
@@ -109,7 +109,8 @@ func main() {
 		case "silent":
 			return device.LogLevelSilent
 		}
-		return device.LogLevelError
+		// Default to verbose/debug level
+		return device.LogLevelVerbose
 	}()
 
 	// open TUN device (or use supplied fd)
@@ -152,7 +153,8 @@ func main() {
 	}
 
 	// Check if we should log only to file (not to console)
-	logFileOnly := os.Getenv("LOG_FILE_ONLY") == "true"
+	// Default to file-only logging unless explicitly set to "false"
+	logFileOnly := os.Getenv("LOG_FILE_ONLY") != "false"
 
 	// Create log file
 	if logFile != "" && logFile != "-" {
@@ -168,13 +170,13 @@ func main() {
 			logWriter = os.Stderr
 		} else {
 			if logFileOnly {
-				// Only write to file, not to console
+				// Only write to file, not to console (default behavior)
 				logWriter = file
-				fmt.Fprintf(os.Stderr, "Logging to file only: %s\n", logFile)
+				fmt.Fprintf(os.Stderr, "Debug logging enabled, output to file only: %s\n", logFile)
 			} else {
-				// Use both file and stderr for logging
+				// Use both file and stderr for logging (when explicitly enabled)
 				logWriter = io.MultiWriter(os.Stderr, file)
-				fmt.Fprintf(os.Stderr, "Logging to file: %s\n", logFile)
+				fmt.Fprintf(os.Stderr, "Debug logging enabled, output to both console and file: %s\n", logFile)
 			}
 		}
 	}

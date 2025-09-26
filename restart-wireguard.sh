@@ -103,7 +103,7 @@ start_wireguard() {
     print_info "日志文件: $(pwd)/wireguard-go.log"
     
     # 启动守护进程
-    LOG_LEVEL=verbose LOG_FILE_ONLY=true ./wireguard-go utun11 &
+    ./wireguard-go utun11 &
     WG_PID=$!
     
     print_info "等待接口创建..."

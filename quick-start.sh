@@ -88,10 +88,10 @@ stop_existing() {
 start_daemon() {
     print_step "3. 启动 WireGuard 守护进程"
     
-    print_info "启动 wireguard-go (启用详细日志)..."
+    print_info "启动 wireguard-go (默认启用 debug 日志)..."
     print_info "日志文件: $(pwd)/wireguard-go.log"
     print_info "日志仅写入文件，不会污染控制台输出"
-    LOG_LEVEL=verbose LOG_FILE_ONLY=true ./wireguard-go utun11 &
+    ./wireguard-go utun11 &
     WG_PID=$!
     
     print_info "等待接口创建..."
