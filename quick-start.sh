@@ -162,7 +162,32 @@ setup_network() {
     fi
     
     print_info "配置接口 IP: $VPN_IP"
-    ifconfig utun11 inet "$VPN_IP" "$VPN_IP" netmask 255.255.255.255
+    # 使用 ip 命令（现代 Linux 系统）或 ifconfig（macOS/传统系统）
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        # 先启动接口
+        if ip link set utun11 up 2>/dev/null; then
+            print_success "接口 utun11 已启动"
+        else
+            print_error "接口 utun11 启动失败"
+        fi
+        # 然后配置 IP
+        if ip addr add "$VPN_IP/32" dev utun11 2>/dev/null; then
+            print_success "IP 地址配置成功: $VPN_IP"
+        else
+            print_error "IP 地址配置失败: $VPN_IP"
+        fi
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        if ifconfig utun11 inet "$VPN_IP" "$VPN_IP" netmask 255.255.255.255 2>/dev/null; then
+            print_success "IP 地址配置成功: $VPN_IP"
+        else
+            print_error "IP 地址配置失败: $VPN_IP"
+        fi
+    else
+        print_error "无法找到网络配置工具 (ip 或 ifconfig)"
+        exit 1
+    fi
     
     print_info "添加路由..."
     # 从 AllowedIPs 提取网络段
@@ -173,7 +198,22 @@ setup_network() {
         network=$(echo "$network" | tr -d ' ')
         if [[ "$network" =~ ^192\.168\. ]]; then
             print_info "添加路由: $network"
-            route add -net "$network" -interface utun11
+            # 使用 ip 命令（现代 Linux 系统）或 route 命令（macOS/传统系统）
+            if command -v ip >/dev/null 2>&1; then
+                # 使用 ip 命令（Linux）
+                if ip route add "$network" dev utun11 2>/dev/null; then
+                    print_success "路由添加成功: $network"
+                else
+                    print_error "路由添加失败: $network"
+                fi
+            elif command -v route >/dev/null 2>&1; then
+                # 使用 route 命令（macOS/传统系统）
+                if route add -net "$network" -interface utun11 2>/dev/null; then
+                    print_success "路由添加成功: $network"
+                else
+                    print_error "路由添加失败: $network"
+                fi
+            fi
         fi
     done
     
@@ -185,7 +225,16 @@ verify_connection() {
     print_step "6. 验证连接"
     
     print_info "检查接口状态..."
-    INTERFACE_STATUS=$(ifconfig utun11)
+    # 使用 ip 命令（现代 Linux 系统）或 ifconfig（macOS/传统系统）
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        INTERFACE_STATUS=$(ip addr show utun11 2>/dev/null || echo "接口 utun11 不存在")
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        INTERFACE_STATUS=$(ifconfig utun11 2>/dev/null || echo "接口 utun11 不存在")
+    else
+        INTERFACE_STATUS="无法检查接口状态（缺少网络工具）"
+    fi
     echo "$INTERFACE_STATUS"
     
     print_info "检查 WireGuard 状态..."
@@ -193,12 +242,22 @@ verify_connection() {
     echo "$WG_STATUS"
     
     print_info "检查路由..."
-    netstat -rn | grep utun11
+    # 使用 ip 命令（现代 Linux 系统）或 netstat（macOS/传统系统）
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        ip route show | grep utun11 || echo "  没有找到 utun11 相关路由"
+    elif command -v netstat >/dev/null 2>&1; then
+        # 使用 netstat 命令（macOS/传统系统）
+        netstat -rn | grep utun11 || echo "  没有找到 utun11 相关路由"
+    else
+        echo "  无法检查路由（缺少网络工具）"
+    fi
     
     # 尝试 ping 测试
     print_info "测试网络连通性..."
     if echo "$WG_STATUS" | grep -q "192.168.11"; then
-        if ping -c 1 -W 5000 192.168.11.21 >/dev/null 2>&1; then
+        # 使用兼容的 ping 参数（macOS 和 Linux）
+        if ping -c 1 -W 5 192.168.11.21 >/dev/null 2>&1; then
             print_success "网络连通性测试成功！"
         else
             print_info "Ping 测试失败，但这可能是正常的（目标主机可能不响应 ping）"
@@ -218,11 +277,29 @@ show_status() {
     
     echo
     echo "🌐 网络接口:"
-    ifconfig utun11 | head -2
+    # 使用 ip 命令（现代 Linux 系统）或 ifconfig（macOS/传统系统）
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        ip addr show utun11 2>/dev/null | head -2 || echo "  接口 utun11 不存在"
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        ifconfig utun11 2>/dev/null | head -2 || echo "  接口 utun11 不存在"
+    else
+        echo "  无法检查接口状态（缺少网络工具）"
+    fi
     
     echo
     echo "🛣️  相关路由:"
-    netstat -rn | grep utun11
+    # 使用 ip 命令（现代 Linux 系统）或 netstat（macOS/传统系统）
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        ip route show | grep utun11 || echo "  没有找到 utun11 相关路由"
+    elif command -v netstat >/dev/null 2>&1; then
+        # 使用 netstat 命令（macOS/传统系统）
+        netstat -rn | grep utun11 || echo "  没有找到 utun11 相关路由"
+    else
+        echo "  无法检查路由（缺少网络工具）"
+    fi
     
     echo
     echo "🔄 DNS 监控状态:"

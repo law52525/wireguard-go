@@ -75,10 +75,20 @@ stop_wireguard() {
     rm -f /var/run/wireguard/utun11.sock 2>/dev/null || true
     
     # 清理网络接口（如果存在）
-    if ifconfig utun11 >/dev/null 2>&1; then
-        print_info "清理网络路由..."
-        route delete -net 192.168.11.0/24 2>/dev/null || true
-        route delete -net 192.168.10.0/24 2>/dev/null || true
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        if ip link show utun11 >/dev/null 2>&1; then
+            print_info "清理网络路由..."
+            ip route del 192.168.11.0/24 2>/dev/null || true
+            ip route del 192.168.10.0/24 2>/dev/null || true
+        fi
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        if ifconfig utun11 >/dev/null 2>&1; then
+            print_info "清理网络路由..."
+            route delete -net 192.168.11.0/24 2>/dev/null || true
+            route delete -net 192.168.10.0/24 2>/dev/null || true
+        fi
     fi
 }
 
@@ -144,11 +154,57 @@ configure_network() {
     print_step "3. 配置网络接口"
     
     print_info "配置接口 IP: 192.168.11.35"
-    ifconfig utun11 inet 192.168.11.35 192.168.11.35 netmask 255.255.255.255
+    # 使用 ip 命令（现代 Linux 系统）或 ifconfig（macOS/传统系统）
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        # 先启动接口
+        if ip link set utun11 up 2>/dev/null; then
+            print_success "接口 utun11 已启动"
+        else
+            print_error "接口 utun11 启动失败"
+        fi
+        # 然后配置 IP
+        if ip addr add 192.168.11.35/32 dev utun11 2>/dev/null; then
+            print_success "IP 地址配置成功: 192.168.11.35"
+        else
+            print_error "IP 地址配置失败: 192.168.11.35"
+        fi
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        if ifconfig utun11 inet 192.168.11.35 192.168.11.35 netmask 255.255.255.255 2>/dev/null; then
+            print_success "IP 地址配置成功: 192.168.11.35"
+        else
+            print_error "IP 地址配置失败: 192.168.11.35"
+        fi
+    fi
     
     print_info "添加路由..."
-    route add -net 192.168.11.0/24 -interface utun11 2>/dev/null || true
-    route add -net 192.168.10.0/24 -interface utun11 2>/dev/null || true
+    # 使用 ip 命令（现代 Linux 系统）或 route 命令（macOS/传统系统）
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        if ip route add 192.168.11.0/24 dev utun11 2>/dev/null; then
+            print_success "路由添加成功: 192.168.11.0/24"
+        else
+            print_error "路由添加失败: 192.168.11.0/24"
+        fi
+        if ip route add 192.168.10.0/24 dev utun11 2>/dev/null; then
+            print_success "路由添加成功: 192.168.10.0/24"
+        else
+            print_error "路由添加失败: 192.168.10.0/24"
+        fi
+    elif command -v route >/dev/null 2>&1; then
+        # 使用 route 命令（macOS/传统系统）
+        if route add -net 192.168.11.0/24 -interface utun11 2>/dev/null; then
+            print_success "路由添加成功: 192.168.11.0/24"
+        else
+            print_error "路由添加失败: 192.168.11.0/24"
+        fi
+        if route add -net 192.168.10.0/24 -interface utun11 2>/dev/null; then
+            print_success "路由添加成功: 192.168.10.0/24"
+        else
+            print_error "路由添加失败: 192.168.10.0/24"
+        fi
+    fi
     
     print_success "网络配置完成"
 }
@@ -172,8 +228,20 @@ verify_connection() {
     
     # 检查接口状态
     print_info "检查接口状态..."
-    if ! ifconfig utun11 >/dev/null 2>&1; then
-        print_error "接口 utun11 不存在"
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        if ! ip link show utun11 >/dev/null 2>&1; then
+            print_error "接口 utun11 不存在"
+            exit 1
+        fi
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        if ! ifconfig utun11 >/dev/null 2>&1; then
+            print_error "接口 utun11 不存在"
+            exit 1
+        fi
+    else
+        print_error "无法检查接口状态（缺少网络工具）"
         exit 1
     fi
     
@@ -186,7 +254,8 @@ verify_connection() {
     
     # 测试网络连通性
     print_info "测试网络连通性..."
-    if ping -c 1 -W 5000 192.168.11.21 >/dev/null 2>&1; then
+    # 使用兼容的 ping 参数（macOS 和 Linux）
+    if ping -c 1 -W 5 192.168.11.21 >/dev/null 2>&1; then
         print_success "网络连通性测试成功！"
     else
         print_info "网络连通性测试未通过，可能目标不在线"

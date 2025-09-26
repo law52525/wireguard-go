@@ -75,16 +75,39 @@ stop_wireguard() {
 check_interfaces() {
     print_step "2. 检查网络接口状态"
     
-    if ifconfig utun11 >/dev/null 2>&1; then
-        print_info "utun11 接口仍然存在:"
-        ifconfig utun11 | head -2
-        print_info "接口通常会在进程停止后自动消失"
+    # 使用 ip 命令（现代 Linux 系统）或 ifconfig（macOS/传统系统）
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        if ip link show utun11 >/dev/null 2>&1; then
+            print_info "utun11 接口仍然存在:"
+            ip addr show utun11 | head -2
+            print_info "接口通常会在进程停止后自动消失"
+        else
+            print_success "utun11 接口已清理"
+        fi
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        if ifconfig utun11 >/dev/null 2>&1; then
+            print_info "utun11 接口仍然存在:"
+            ifconfig utun11 | head -2
+            print_info "接口通常会在进程停止后自动消失"
+        else
+            print_success "utun11 接口已清理"
+        fi
     else
-        print_success "utun11 接口已清理"
+        print_info "无法检查接口状态（缺少网络工具）"
     fi
     
     # 显示剩余的 utun 接口
-    UTUN_COUNT=$(ifconfig | grep -c "^utun" || true)
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        UTUN_COUNT=$(ip link show | grep -c "^[0-9]*: utun" || true)
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        UTUN_COUNT=$(ifconfig | grep -c "^utun" || true)
+    else
+        UTUN_COUNT="未知"
+    fi
     print_info "当前 utun 接口数量: $UTUN_COUNT"
 }
 
@@ -93,27 +116,56 @@ clean_routes() {
     print_step "3. 清理 VPN 路由"
     
     # 检查是否有 VPN 相关路由
-    VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
-    
-    if [[ -n "$VPN_ROUTES" ]]; then
-        print_info "发现 VPN 相关路由:"
-        echo "$VPN_ROUTES"
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        VPN_ROUTES=$(ip route show | grep "192.168.1" || true)
         
-        print_info "清理路由..."
-        # 删除常见的 VPN 路由
-        route delete -net 192.168.11.0/24 2>/dev/null || true
-        route delete -net 192.168.10.0/24 2>/dev/null || true
-        
-        # 检查是否还有全局 VPN 路由
-        if netstat -rn | grep "0.0.0.0/1.*utun" >/dev/null 2>&1; then
-            print_info "发现全局 VPN 路由，正在清理..."
-            route delete -net 0.0.0.0/1 2>/dev/null || true
-            route delete -net 128.0.0.0/1 2>/dev/null || true
+        if [[ -n "$VPN_ROUTES" ]]; then
+            print_info "发现 VPN 相关路由:"
+            echo "$VPN_ROUTES"
+            
+            print_info "清理路由..."
+            # 删除常见的 VPN 路由
+            ip route del 192.168.11.0/24 2>/dev/null || true
+            ip route del 192.168.10.0/24 2>/dev/null || true
+            
+            # 检查是否还有全局 VPN 路由
+            if ip route show | grep "0.0.0.0/1.*utun" >/dev/null 2>&1; then
+                print_info "发现全局 VPN 路由，正在清理..."
+                ip route del 0.0.0.0/1 2>/dev/null || true
+                ip route del 128.0.0.0/1 2>/dev/null || true
+            fi
+            
+            print_success "路由清理完成"
+        else
+            print_info "没有发现 VPN 相关路由"
         fi
+    elif command -v netstat >/dev/null 2>&1; then
+        # 使用 netstat 命令（macOS/传统系统）
+        VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
         
-        print_success "路由清理完成"
+        if [[ -n "$VPN_ROUTES" ]]; then
+            print_info "发现 VPN 相关路由:"
+            echo "$VPN_ROUTES"
+            
+            print_info "清理路由..."
+            # 删除常见的 VPN 路由
+            route delete -net 192.168.11.0/24 2>/dev/null || true
+            route delete -net 192.168.10.0/24 2>/dev/null || true
+            
+            # 检查是否还有全局 VPN 路由
+            if netstat -rn | grep "0.0.0.0/1.*utun" >/dev/null 2>&1; then
+                print_info "发现全局 VPN 路由，正在清理..."
+                route delete -net 0.0.0.0/1 2>/dev/null || true
+                route delete -net 128.0.0.0/1 2>/dev/null || true
+            fi
+            
+            print_success "路由清理完成"
+        else
+            print_info "没有发现 VPN 相关路由"
+        fi
     else
-        print_info "没有发现 VPN 相关路由"
+        print_info "无法检查路由（缺少网络工具）"
     fi
 }
 
@@ -159,19 +211,45 @@ verify_cleanup() {
     fi
     
     # 检查接口
-    if ifconfig utun11 >/dev/null 2>&1; then
-        print_info "⚠️  utun11 接口仍然存在"
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        if ip link show utun11 >/dev/null 2>&1; then
+            print_info "⚠️  utun11 接口仍然存在"
+        else
+            print_success "✅ utun11 接口已清理"
+        fi
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        if ifconfig utun11 >/dev/null 2>&1; then
+            print_info "⚠️  utun11 接口仍然存在"
+        else
+            print_success "✅ utun11 接口已清理"
+        fi
     else
-        print_success "✅ utun11 接口已清理"
+        print_info "⚠️  无法检查接口状态（缺少网络工具）"
     fi
     
     # 检查路由
-    VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
-    if [[ -n "$VPN_ROUTES" ]]; then
-        print_info "⚠️  仍有 VPN 相关路由:"
-        echo "$VPN_ROUTES"
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        VPN_ROUTES=$(ip route show | grep "192.168.1" || true)
+        if [[ -n "$VPN_ROUTES" ]]; then
+            print_info "⚠️  仍有 VPN 相关路由:"
+            echo "$VPN_ROUTES"
+        else
+            print_success "✅ VPN 路由已清理"
+        fi
+    elif command -v netstat >/dev/null 2>&1; then
+        # 使用 netstat 命令（macOS/传统系统）
+        VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
+        if [[ -n "$VPN_ROUTES" ]]; then
+            print_info "⚠️  仍有 VPN 相关路由:"
+            echo "$VPN_ROUTES"
+        else
+            print_success "✅ VPN 路由已清理"
+        fi
     else
-        print_success "✅ VPN 路由已清理"
+        print_info "⚠️  无法检查路由（缺少网络工具）"
     fi
     
     # 检查 Socket
@@ -200,20 +278,46 @@ show_final_status() {
     
     echo
     echo "🌐 网络接口:"
-    UTUN_INTERFACES=$(ifconfig | grep "^utun" || true)
-    if [[ -n "$UTUN_INTERFACES" ]]; then
-        echo "$UTUN_INTERFACES"
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        UTUN_INTERFACES=$(ip link show | grep "^[0-9]*: utun" || true)
+        if [[ -n "$UTUN_INTERFACES" ]]; then
+            echo "$UTUN_INTERFACES"
+        else
+            echo "  没有 utun 接口"
+        fi
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # 使用 ifconfig 命令（macOS/传统系统）
+        UTUN_INTERFACES=$(ifconfig | grep "^utun" || true)
+        if [[ -n "$UTUN_INTERFACES" ]]; then
+            echo "$UTUN_INTERFACES"
+        else
+            echo "  没有 utun 接口"
+        fi
     else
-        echo "  没有 utun 接口"
+        echo "  无法检查接口（缺少网络工具）"
     fi
     
     echo
     echo "🛣️  路由表 (VPN 相关):"
-    VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
-    if [[ -n "$VPN_ROUTES" ]]; then
-        echo "$VPN_ROUTES"
+    if command -v ip >/dev/null 2>&1; then
+        # 使用 ip 命令（Linux）
+        VPN_ROUTES=$(ip route show | grep "192.168.1" || true)
+        if [[ -n "$VPN_ROUTES" ]]; then
+            echo "$VPN_ROUTES"
+        else
+            echo "  没有 VPN 相关路由"
+        fi
+    elif command -v netstat >/dev/null 2>&1; then
+        # 使用 netstat 命令（macOS/传统系统）
+        VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
+        if [[ -n "$VPN_ROUTES" ]]; then
+            echo "$VPN_ROUTES"
+        else
+            echo "  没有 VPN 相关路由"
+        fi
     else
-        echo "  没有 VPN 相关路由"
+        echo "  无法检查路由（缺少网络工具）"
     fi
     
     echo
