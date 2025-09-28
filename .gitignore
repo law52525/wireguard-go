@@ -12,7 +12,6 @@ wg0.conf
 *.o
 *.a
 *.so
-*.dll
 *.exe
 .DS_Store
 
@@ -34,3 +33,7 @@ Desktop.ini
 # 临时目录
 tmp/
 temp/
+
+# wintun.dll 文件
+wintun/
+*.dll

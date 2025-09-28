@@ -1,7 +1,7 @@
 # WireGuard-Go Makefile
 # 支持跨平台编译
 
-.PHONY: all build build-linux build-windows build-macos clean test
+.PHONY: all build build-linux build-windows build-macos clean test download-wintun
 
 # 默认目标
 all: build
@@ -28,6 +28,10 @@ endif
 build:
 	@echo "🔨 Building for $(OS)..."
 	@go build -o $(TARGET) .
+	@if [ "$(OS)" = "windows" ] && [ -f "wintun/wintun/bin/amd64/wintun.dll" ]; then \
+		echo "📦 Copying wintun.dll..."; \
+		cp wintun/wintun/bin/amd64/wintun.dll .; \
+	fi
 	@echo "✅ Build completed: $(TARGET)"
 
 # Linux 构建
@@ -40,6 +44,10 @@ build-linux:
 build-windows:
 	@echo "🪟 Building for Windows..."
 	@GOOS=windows GOARCH=amd64 go build -o wireguard-go-windows.exe .
+	@if [ -f "wintun/wintun/bin/amd64/wintun.dll" ]; then \
+		echo "📦 Copying wintun.dll for amd64..."; \
+		cp wintun/wintun/bin/amd64/wintun.dll .; \
+	fi
 	@echo "✅ Windows build completed: wireguard-go-windows.exe"
 
 # macOS 构建
@@ -83,21 +91,27 @@ deps:
 	@go mod download
 	@echo "✅ Dependencies installed"
 
+# 下载 wintun.dll
+download-wintun:
+	@echo "📥 Downloading wintun.dll for Windows development..."
+	@./download-wintun.sh
+
 # 帮助
 help:
 	@echo "WireGuard-Go Build System"
 	@echo "========================"
 	@echo "Available targets:"
-	@echo "  build         - Build for current platform"
-	@echo "  build-linux   - Build for Linux"
-	@echo "  build-windows - Build for Windows"
-	@echo "  build-macos   - Build for macOS"
-	@echo "  build-all     - Build for all platforms"
-	@echo "  build-tools   - Build command line tools"
-	@echo "  clean         - Clean build artifacts"
-	@echo "  test          - Run tests"
-	@echo "  deps          - Install dependencies"
-	@echo "  help          - Show this help"
+	@echo "  build            - Build for current platform"
+	@echo "  build-linux      - Build for Linux"
+	@echo "  build-windows    - Build for Windows"
+	@echo "  build-macos      - Build for macOS"
+	@echo "  build-all        - Build for all platforms"
+	@echo "  build-tools      - Build command line tools"
+	@echo "  download-wintun  - Download wintun.dll for Windows"
+	@echo "  clean            - Clean build artifacts"
+	@echo "  test             - Run tests"
+	@echo "  deps             - Install dependencies"
+	@echo "  help             - Show this help"
 	@echo ""
 	@echo "Current platform: $(OS)"
 	@echo "Target file: $(TARGET)"

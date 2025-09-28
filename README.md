@@ -12,6 +12,7 @@ This fork includes advanced **Dynamic DNS Endpoint Monitoring** functionality:
 - **📊 Management Tools**: Built-in commands for monitoring and configuration
 - **🔒 Thread-Safe**: Robust implementation with comprehensive error handling
 - **⬅️ Backward Compatible**: Works seamlessly with existing static IP configurations
+- **🖥️ Cross-Platform**: Full support for Linux, macOS, and Windows (with wintun.dll)
 
 ### Quick Start with Dynamic DNS
 
@@ -77,10 +78,25 @@ This will run on OpenBSD. It does not yet support sticky sockets. Fwmark is mapp
 
 This requires an installation of the latest version of [Go](https://go.dev/).
 
-```
-$ git clone https://git.zx2c4.com/wireguard-go
+### Linux/macOS
+
+```bash
+$ git clone https://github.com/law52525/wireguard-go.git
 $ cd wireguard-go
 $ make
+```
+
+### Windows
+
+```cmd
+# 下载预编译版本（推荐）
+# 从 GitHub Releases 下载 wireguard-go-windows-amd64.zip
+
+# 或从源码编译
+git clone https://github.com/law52525/wireguard-go.git
+cd wireguard-go
+make download-wintun
+make build-windows
 ```
 
 ## License
