@@ -198,15 +198,19 @@ make build
 - ✅ **日志系统**: 支持文件输出和控制台输出
 - ✅ **UAPI 通信**: 使用 Windows 命名管道 (`\\.\pipe\wireguard\<interface>`)
 - ✅ **管理员权限**: 自动检测并提供权限提示
+- ⚠️ **网络配置**: 需要手动配置TUN接口IP地址和路由 (与官方WireGuard for Windows不同)
 
-### Linux/macOS 用户
+### Windows 用户详细配置
 
-### 1. 准备配置文件
+#### 重要说明
+WireGuard-Go在Windows上与官方WireGuard for Windows有一个重要区别：**不会自动配置TUN接口的IP地址和路由**。需要手动配置网络接口。
+
+#### 1. 准备配置文件
 
 编辑 `wg0.conf`:
 ```ini
 [Interface]
-# 生成命令: ./cmd/wg-go/wg-go genkey
+# 生成命令: ./cmd/wg-go/wg-go.exe genkey
 PrivateKey = YOUR_PRIVATE_KEY
 Address = 192.168.11.35/32
 DNS = 8.8.8.8
@@ -220,6 +224,89 @@ Endpoint = server.example.com:51820
 AllowedIPs = 192.168.11.0/24, 192.168.10.0/24
 PersistentKeepalive = 25
 ```
+
+#### 2. 生成密钥对
+```cmd
+REM 生成私钥
+cmd\wg-go\wg-go.exe genkey
+
+REM 生成对应的公钥
+echo PRIVATE_KEY | cmd\wg-go\wg-go.exe pubkey
+
+REM 生成预共享密钥
+cmd\wg-go\wg-go.exe genpsk
+```
+
+#### 3. 一键启动 (推荐)
+```cmd
+REM 以管理员身份运行
+quick-start-windows.bat
+```
+
+#### 4. 手动启动和配置
+```cmd
+REM 1. 启动WireGuard守护进程
+wireguard-go.exe wg0
+
+REM 2. 应用配置
+cmd\wg-go\wg-go.exe setconf wg0 wg0.conf
+
+REM 3. 手动配置网络接口 (重要!)
+REM 设置接口IP地址
+netsh interface ip set address "wg0" static 192.168.101.20 255.255.255.0
+
+REM 添加路由到对等网络
+route add 192.168.100.0 mask 255.255.255.0 192.168.101.20
+route add 192.168.101.0 mask 255.255.255.0 192.168.101.20
+
+REM 设置DNS服务器
+netsh interface ip set dns "wg0" static 8.8.8.8
+```
+
+#### 5. 验证连接
+```cmd
+REM 查看连接状态
+cmd\wg-go\wg-go.exe show wg0
+
+REM 检查网络接口
+ipconfig
+
+REM 检查路由表
+route print | findstr "192.168"
+
+REM 测试连通性
+ping 192.168.100.1
+```
+
+#### 6. 停止服务
+```cmd
+REM 自动停止 (推荐)
+stop-wireguard-windows.bat
+
+REM 手动停止
+REM 停止WireGuard进程
+taskkill /f /im wireguard-go.exe
+
+REM 清理路由
+route delete 192.168.100.0
+route delete 192.168.101.0
+
+REM 重置接口配置 (可选)
+netsh interface ip set address "wg0" dhcp
+netsh interface ip set dns "wg0" dhcp
+```
+
+**停止脚本功能**:
+- ✅ **自动停止进程**: 正常停止或强制停止WireGuard进程
+- ✅ **清理路由**: 自动删除对等网络路由
+- ✅ **接口重置**: 可选择重置wg0接口为DHCP模式
+- ✅ **状态检查**: 显示清理结果和接口状态
+
+### Linux/macOS 用户
+
+#### 1. 准备配置文件
+
+编辑 `wg0.conf`:
 
 ### 2. 生成密钥对
 ```bash

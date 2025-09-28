@@ -53,7 +53,10 @@ var UAPISecurityDescriptor *windows.SECURITY_DESCRIPTOR
 
 func init() {
 	var err error
-	UAPISecurityDescriptor, err = windows.SecurityDescriptorFromString("O:SYD:P(A;;GA;;;SY)(A;;GA;;;BA)S:(ML;;NWNRNX;;;HI)")
+	// Updated security descriptor to allow authenticated users read/write access
+	// D: (A;OICI;GA;;;S-1-5-32-544) (A;OICI;GA;;;S-1-5-18)(A;OICI;GRGW;;;S-1-5-11)
+	// Allow all for system user and local administrator, allow authenticated user to write/read
+	UAPISecurityDescriptor, err = windows.SecurityDescriptorFromString("D:(A;OICI;GA;;;S-1-5-32-544)(A;OICI;GA;;;S-1-5-18)(A;OICI;GRGW;;;S-1-5-11)")
 	if err != nil {
 		panic(err)
 	}

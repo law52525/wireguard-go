@@ -137,11 +137,22 @@ func checkWireGuardAccessUnix() bool {
 // Check WireGuard access on Windows
 func checkWireGuardAccessWindows() bool {
 	// On Windows, we check for named pipes instead of socket files
-	// This is a simplified check - in practice, we'd need to enumerate named pipes
-	fmt.Println("🔍 Checking WireGuard interfaces on Windows...")
-	fmt.Println("💡 Make sure WireGuard interfaces are running.")
-	fmt.Printf("   To start an interface: %s\n", getStartCommand())
-	return true // Assume available, let the actual connection attempt handle errors
+	interfaces, err := discoverInterfaces()
+	if err != nil {
+		fmt.Printf("🚫 Error discovering WireGuard interfaces: %v\n", err)
+		fmt.Println("💡 Make sure WireGuard interfaces are running.")
+		fmt.Printf("   To start an interface: %s\n", getStartCommand())
+		return false
+	}
+	
+	if len(interfaces) == 0 {
+		fmt.Println("🚫 No WireGuard interfaces found")
+		fmt.Println("💡 Make sure WireGuard interfaces are running.")
+		fmt.Printf("   To start an interface: %s\n", getStartCommand())
+		return false
+	}
+	
+	return true
 }
 
 // Get platform-specific start command
