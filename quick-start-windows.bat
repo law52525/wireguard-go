@@ -45,25 +45,40 @@ if %errorLevel% neq 0 (
 
 echo %GREEN%[OK] Go environment check passed%NC%
 
-REM Compile program
-echo %YELLOW%[BUILD] Compiling WireGuard-Go...%NC%
-call build.bat build
-if %errorLevel% neq 0 (
-    echo %RED%[ERROR] Compilation failed%NC%
-    pause
-    exit /b 1
+REM Check if wireguard-go.exe exists
+if exist "wireguard-go.exe" (
+    echo %GREEN%[INFO] wireguard-go.exe already exists, skipping compilation%NC%
+) else (
+    REM Compile program
+    echo %YELLOW%[BUILD] Compiling WireGuard-Go...%NC%
+    call build.bat build
+    if %errorLevel% neq 0 (
+        echo %RED%[ERROR] Compilation failed%NC%
+        pause
+        exit /b 1
+    )
 )
 
-REM Compile command line tool
-echo %YELLOW%[BUILD] Compiling command line tool...%NC%
-cd cmd\wg-go
-go build -o wg-go.exe .
-if %errorLevel% neq 0 (
-    echo %RED%[ERROR] Command line tool compilation failed%NC%
-    pause
-    exit /b 1
+REM Check if wg-go.exe exists (check both possible locations)
+if exist "wg-go.exe" (
+    echo %GREEN%[INFO] wg-go.exe already exists in current directory, skipping compilation%NC%
+    set "WG_GO_PATH=wg-go.exe"
+) else if exist "%WG_GO_PATH%" (
+    echo %GREEN%[INFO] wg-go.exe already exists in cmd\wg-go\, skipping compilation%NC%
+    set "WG_GO_PATH=%WG_GO_PATH%"
+) else (
+    REM Compile command line tool
+    echo %YELLOW%[BUILD] Compiling command line tool...%NC%
+    cd cmd\wg-go
+    go build -o wg-go.exe .
+    if %errorLevel% neq 0 (
+        echo %RED%[ERROR] Command line tool compilation failed%NC%
+        pause
+        exit /b 1
+    )
+    cd ..\..
+    set "WG_GO_PATH=%WG_GO_PATH%"
 )
-cd ..\..
 
 echo %GREEN%[OK] Command line tool compilation successful%NC%
 
@@ -107,7 +122,7 @@ timeout /t 2 /nobreak >nul
 REM Apply configuration
 if exist "%CONFIG_FILE%" (
     echo %YELLOW%[CONFIG] Applying configuration file...%NC%
-    cmd\wg-go\wg-go.exe setconf %INTERFACE_NAME% %CONFIG_FILE%
+    %WG_GO_PATH% setconf %INTERFACE_NAME% %CONFIG_FILE%
     if %errorLevel% equ 0 (
         echo %GREEN%[OK] Configuration applied successfully%NC%
     ) else (
@@ -140,18 +155,11 @@ echo Adding routes to peer networks...
 echo Waiting 5 seconds for interface to stabilize...
 timeout /t 5 /nobreak >nul
 REM Use interface name instead of IP for routing
-route add 192.168.100.0 mask 255.255.255.0 192.168.101.1
+route add 192.168.100.0 mask 255.255.255.0 %INTERFACE_IP%
 if %errorLevel% equ 0 (
     echo %GREEN%[OK] Route 192.168.100.0/24 added successfully%NC%
 ) else (
     echo %YELLOW%[WARN] Route 192.168.100.0/24 may already exist%NC%
-)
-
-route add 192.168.101.0 mask 255.255.255.0 192.168.101.1
-if %errorLevel% equ 0 (
-    echo %GREEN%[OK] Route 192.168.101.0/24 added successfully%NC%
-) else (
-    echo %YELLOW%[WARN] Route 192.168.101.0/24 may already exist%NC%
 )
 
 REM Set DNS server
@@ -174,11 +182,11 @@ tasklist /fi "imagename eq wireguard-go.exe" | find /i "wireguard-go.exe"
 
 echo.
 echo %YELLOW%[INTERFACE] Interface Status:%NC%
-cmd\wg-go\wg-go.exe show %INTERFACE_NAME%
+%WG_GO_PATH% show %INTERFACE_NAME%
 
 echo.
 echo %YELLOW%[DNS] DNS Monitoring Status:%NC%
-cmd\wg-go\wg-go.exe dns %INTERFACE_NAME% show
+%WG_GO_PATH% dns %INTERFACE_NAME% show
 
 echo.
 echo %YELLOW%[LOG] Log File:%NC%
@@ -194,9 +202,9 @@ echo.
 echo %GREEN%[SUCCESS] WireGuard-Go startup completed!%NC%
 echo.
 echo %YELLOW%[USAGE] Usage Instructions:%NC%
-echo   - View status: cmd\wg-go\wg-go.exe show %INTERFACE_NAME%
-echo   - DNS monitoring: cmd\wg-go\wg-go.exe dns %INTERFACE_NAME% show
-echo   - Set interval: cmd\wg-go\wg-go.exe dns %INTERFACE_NAME% interval 30
+echo   - View status: %WG_GO_PATH% show %INTERFACE_NAME%
+echo   - DNS monitoring: %WG_GO_PATH% dns %INTERFACE_NAME% show
+echo   - Set interval: %WG_GO_PATH% dns %INTERFACE_NAME% interval 30
 echo   - View logs: type %LOG_FILE%
 echo   - Stop service: taskkill /f /im wireguard-go.exe
 echo.
