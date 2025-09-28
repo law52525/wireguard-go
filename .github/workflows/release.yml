@@ -54,6 +54,7 @@ jobs:
 
     - name: Download wintun.dll (Windows only)
       if: matrix.goos == 'windows'
+      shell: bash
       run: |
         # Download wintun-0.14.1.zip
         curl -L -o wintun.zip https://www.wintun.net/builds/wintun-0.14.1.zip
@@ -79,6 +80,7 @@ jobs:
         fi
 
     - name: Generate version
+      shell: bash
       run: |
         # Generate version.go for the main project
         export GIT_CEILING_DIRECTORIES="$(realpath .)" && \
@@ -87,17 +89,20 @@ jobs:
         echo "$ver" > version.go
 
     - name: Build wireguard-go
+      shell: bash
       run: |
         # Build the main wireguard-go binary
         CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags="-s -w" -o wireguard-go-${{ matrix.goos }}-${{ matrix.goarch }}
 
     - name: Build wg-go
+      shell: bash
       run: |
         # Build the wg-go binary from cmd/wg-go directory
         cd cmd/wg-go
         CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags="-s -w" -o wg-go-${{ matrix.goos }}-${{ matrix.goarch }}
 
     - name: Create release directory
+      shell: bash
       run: |
         mkdir -p release
         mv wireguard-go-${{ matrix.goos }}-${{ matrix.goarch }} release/
@@ -137,6 +142,7 @@ jobs:
         path: ./artifacts
 
     - name: Prepare release assets
+      shell: bash
       run: |
         mkdir -p release-assets
         
@@ -156,6 +162,11 @@ jobs:
             if [ -f "$artifact/wg-go-$platform_arch" ]; then
               cp "$artifact/wg-go-$platform_arch" "release-assets/$platform_arch/wg-go"
               chmod +x "release-assets/$platform_arch/wg-go"
+            fi
+            
+            # Copy wintun.dll for Windows builds
+            if [ -f "$artifact/wintun.dll" ] && [[ "$platform_arch" == windows-* ]]; then
+              cp "$artifact/wintun.dll" "release-assets/$platform_arch/wintun.dll"
             fi
           fi
         done
