@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,8 @@ import (
 const (
 	// Default socket directory for UAPI on Unix systems
 	DefaultSocketDir = "/var/run/wireguard"
+	// Default named pipe path for UAPI on Windows
+	DefaultNamedPipePath = `\\.\pipe\wireguard`
 )
 
 // InterfaceInfo contains information about a WireGuard interface
@@ -90,6 +93,14 @@ func discoverInterfaces() ([]string, error) {
 
 // Connect to UAPI socket for the given interface
 func connectToInterface(interfaceName string) (net.Conn, error) {
+	if runtime.GOOS == "windows" {
+		return connectToInterfaceWindows(interfaceName)
+	}
+	return connectToInterfaceUnix(interfaceName)
+}
+
+// Connect to UAPI on Unix systems (Unix socket)
+func connectToInterfaceUnix(interfaceName string) (net.Conn, error) {
 	socketPath := filepath.Join(DefaultSocketDir, interfaceName+".sock")
 
 	// Check if socket exists
@@ -103,6 +114,26 @@ func connectToInterface(interfaceName string) (net.Conn, error) {
 		// Check if it's a permission error
 		if strings.Contains(err.Error(), "permission denied") {
 			return nil, fmt.Errorf("permission denied accessing interface '%s'\n💡 Try running with sudo: sudo ./cmd/wg-go/wg-go show %s", interfaceName, interfaceName)
+		}
+		return nil, fmt.Errorf("failed to connect to interface '%s': %v", interfaceName, err)
+	}
+
+	return conn, nil
+}
+
+// Connect to UAPI on Windows (Named pipe)
+func connectToInterfaceWindows(interfaceName string) (net.Conn, error) {
+	// Construct named pipe path
+	pipePath := fmt.Sprintf(`\\.\pipe\wireguard\%s`, interfaceName)
+
+	// Connect to named pipe with timeout
+	conn, err := net.DialTimeout("npipe", pipePath, 5*time.Second)
+	if err != nil {
+		if strings.Contains(err.Error(), "access is denied") {
+			return nil, fmt.Errorf("access denied to interface '%s'\n💡 Try running as administrator: cmd /c 'cmd /c \"cmd /c wg-go show %s\"'", interfaceName, interfaceName)
+		}
+		if strings.Contains(err.Error(), "cannot find the file") {
+			return nil, fmt.Errorf("interface '%s' not found (named pipe %s does not exist)", interfaceName, pipePath)
 		}
 		return nil, fmt.Errorf("failed to connect to interface '%s': %v", interfaceName, err)
 	}
