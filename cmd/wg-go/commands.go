@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -91,12 +92,20 @@ func handleShow(args []string) {
 
 // Check if we can access WireGuard interfaces and provide helpful guidance
 func checkWireGuardAccess() bool {
+	if runtime.GOOS == "windows" {
+		return checkWireGuardAccessWindows()
+	}
+	return checkWireGuardAccessUnix()
+}
+
+// Check WireGuard access on Unix systems
+func checkWireGuardAccessUnix() bool {
 	// Check if WireGuard directory exists
-	socketDir := "/var/run/wireguard"
+	socketDir := DefaultSocketDir
 	if _, err := os.Stat(socketDir); os.IsNotExist(err) {
 		fmt.Printf("🚫 WireGuard directory not found: %s\n", socketDir)
 		fmt.Println("💡 This usually means no WireGuard interfaces are running.")
-		fmt.Println("   To start an interface: sudo ./wireguard-go utun")
+		fmt.Printf("   To start an interface: %s\n", getStartCommand())
 		return false
 	}
 
@@ -104,7 +113,7 @@ func checkWireGuardAccess() bool {
 	entries, err := os.ReadDir(socketDir)
 	if err != nil {
 		fmt.Printf("❌ Cannot access WireGuard directory: %v\n", err)
-		fmt.Println("💡 Try running with sudo: sudo ./cmd/wg-go/wg-go show")
+		fmt.Printf("💡 Try running with: %s\n", getShowCommand())
 		return false
 	}
 
@@ -118,11 +127,37 @@ func checkWireGuardAccess() bool {
 
 	if socketCount == 0 {
 		fmt.Println("📭 No WireGuard interfaces found.")
-		fmt.Println("💡 To create an interface: sudo ./wireguard-go utun")
+		fmt.Printf("💡 To create an interface: %s\n", getStartCommand())
 		return false
 	}
 
 	return true
+}
+
+// Check WireGuard access on Windows
+func checkWireGuardAccessWindows() bool {
+	// On Windows, we check for named pipes instead of socket files
+	// This is a simplified check - in practice, we'd need to enumerate named pipes
+	fmt.Println("🔍 Checking WireGuard interfaces on Windows...")
+	fmt.Println("💡 Make sure WireGuard interfaces are running.")
+	fmt.Printf("   To start an interface: %s\n", getStartCommand())
+	return true // Assume available, let the actual connection attempt handle errors
+}
+
+// Get platform-specific start command
+func getStartCommand() string {
+	if runtime.GOOS == "windows" {
+		return "wireguard-go.exe <interface-name>"
+	}
+	return "sudo ./wireguard-go <interface-name>"
+}
+
+// Get platform-specific show command
+func getShowCommand() string {
+	if runtime.GOOS == "windows" {
+		return "cmd\\wg-go\\wg-go.exe show"
+	}
+	return "sudo ./cmd/wg-go/wg-go show"
 }
 
 // Handle 'set' command - set WireGuard configuration
@@ -164,7 +199,7 @@ func handleSetconf(args []string) {
 	err = setInterfaceConfig(interfaceName, config)
 	if err != nil {
 		fmt.Printf("Failed to apply configuration via UAPI: %v\n", err)
-		fmt.Println("Note: Make sure the interface is running with 'sudo ./wireguard-go <interface>'")
+		fmt.Printf("Note: Make sure the interface is running with '%s'\n", getStartCommand())
 
 		// Show configuration summary as fallback
 		fmt.Printf("\nConfiguration summary:\n")
@@ -240,7 +275,7 @@ func showAllInterfaces() {
 
 	if len(interfaces) == 0 {
 		fmt.Println("No WireGuard interfaces found.")
-		fmt.Println("To create an interface, run: sudo ./wireguard-go <interface-name>")
+		fmt.Printf("To create an interface, run: %s\n", getStartCommand())
 		return
 	}
 
@@ -264,7 +299,7 @@ func showInterface(name string) {
 	info, err := getInterfaceInfo(name)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting interface info: %v\n", err)
-		fmt.Printf("Make sure interface '%s' is running with: sudo ./wireguard-go %s\n", name, name)
+		fmt.Printf("Make sure interface '%s' is running with: %s\n", name, strings.Replace(getStartCommand(), "<interface-name>", name, 1))
 		return
 	}
 

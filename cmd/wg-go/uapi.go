@@ -67,6 +67,14 @@ func formatBytes(bytes int64) string {
 
 // Discover all WireGuard interfaces by scanning the socket directory
 func discoverInterfaces() ([]string, error) {
+	if runtime.GOOS == "windows" {
+		return discoverInterfacesWindows()
+	}
+	return discoverInterfacesUnix()
+}
+
+// Discover interfaces on Unix systems
+func discoverInterfacesUnix() ([]string, error) {
 	var interfaces []string
 
 	// Check if socket directory exists
@@ -91,6 +99,26 @@ func discoverInterfaces() ([]string, error) {
 	return interfaces, nil
 }
 
+// Discover interfaces on Windows (simplified - would need named pipe enumeration)
+func discoverInterfacesWindows() ([]string, error) {
+	// On Windows, we can't easily enumerate named pipes from Go
+	// This is a simplified implementation that returns common interface names
+	// In practice, you might want to use Windows API to enumerate named pipes
+	commonInterfaces := []string{"wg0", "wg1", "wg2", "utun0", "utun1", "utun2"}
+
+	// Try to connect to each interface to see if it exists
+	var validInterfaces []string
+	for _, iface := range commonInterfaces {
+		conn, err := connectToInterface(iface)
+		if err == nil {
+			conn.Close()
+			validInterfaces = append(validInterfaces, iface)
+		}
+	}
+
+	return validInterfaces, nil
+}
+
 // Connect to UAPI socket for the given interface
 func connectToInterface(interfaceName string) (net.Conn, error) {
 	if runtime.GOOS == "windows" {
@@ -113,7 +141,7 @@ func connectToInterfaceUnix(interfaceName string) (net.Conn, error) {
 	if err != nil {
 		// Check if it's a permission error
 		if strings.Contains(err.Error(), "permission denied") {
-			return nil, fmt.Errorf("permission denied accessing interface '%s'\n💡 Try running with sudo: sudo ./cmd/wg-go/wg-go show %s", interfaceName, interfaceName)
+			return nil, fmt.Errorf("permission denied accessing interface '%s'\n💡 Try running with: %s %s", interfaceName, getShowCommand(), interfaceName)
 		}
 		return nil, fmt.Errorf("failed to connect to interface '%s': %v", interfaceName, err)
 	}
