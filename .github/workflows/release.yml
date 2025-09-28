@@ -92,21 +92,34 @@ jobs:
       shell: bash
       run: |
         # Build the main wireguard-go binary
-        CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags="-s -w" -o wireguard-go-${{ matrix.goos }}-${{ matrix.goarch }}
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags="-s -w" -o wireguard-go-${{ matrix.goos }}-${{ matrix.goarch }}.exe
+        else
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags="-s -w" -o wireguard-go-${{ matrix.goos }}-${{ matrix.goarch }}
+        fi
 
     - name: Build wg-go
       shell: bash
       run: |
         # Build the wg-go binary from cmd/wg-go directory
         cd cmd/wg-go
-        CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags="-s -w" -o wg-go-${{ matrix.goos }}-${{ matrix.goarch }}
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags="-s -w" -o wg-go-${{ matrix.goos }}-${{ matrix.goarch }}.exe
+        else
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags="-s -w" -o wg-go-${{ matrix.goos }}-${{ matrix.goarch }}
+        fi
 
     - name: Create release directory
       shell: bash
       run: |
         mkdir -p release
-        mv wireguard-go-${{ matrix.goos }}-${{ matrix.goarch }} release/
-        mv cmd/wg-go/wg-go-${{ matrix.goos }}-${{ matrix.goarch }} release/
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          mv wireguard-go-${{ matrix.goos }}-${{ matrix.goarch }}.exe release/
+          mv cmd/wg-go/wg-go-${{ matrix.goos }}-${{ matrix.goarch }}.exe release/
+        else
+          mv wireguard-go-${{ matrix.goos }}-${{ matrix.goarch }} release/
+          mv cmd/wg-go/wg-go-${{ matrix.goos }}-${{ matrix.goarch }} release/
+        fi
         
         # Copy wintun.dll for Windows builds
         if [ "${{ matrix.goos }}" = "windows" ]; then
@@ -153,15 +166,27 @@ jobs:
             mkdir -p "release-assets/$platform_arch"
             
             # Copy wireguard-go binary
-            if [ -f "$artifact/wireguard-go-$platform_arch" ]; then
-              cp "$artifact/wireguard-go-$platform_arch" "release-assets/$platform_arch/wireguard-go"
-              chmod +x "release-assets/$platform_arch/wireguard-go"
+            if [[ "$platform_arch" == windows-* ]]; then
+              if [ -f "$artifact/wireguard-go-$platform_arch.exe" ]; then
+                cp "$artifact/wireguard-go-$platform_arch.exe" "release-assets/$platform_arch/wireguard-go.exe"
+              fi
+            else
+              if [ -f "$artifact/wireguard-go-$platform_arch" ]; then
+                cp "$artifact/wireguard-go-$platform_arch" "release-assets/$platform_arch/wireguard-go"
+                chmod +x "release-assets/$platform_arch/wireguard-go"
+              fi
             fi
             
             # Copy wg-go binary
-            if [ -f "$artifact/wg-go-$platform_arch" ]; then
-              cp "$artifact/wg-go-$platform_arch" "release-assets/$platform_arch/wg-go"
-              chmod +x "release-assets/$platform_arch/wg-go"
+            if [[ "$platform_arch" == windows-* ]]; then
+              if [ -f "$artifact/wg-go-$platform_arch.exe" ]; then
+                cp "$artifact/wg-go-$platform_arch.exe" "release-assets/$platform_arch/wg-go.exe"
+              fi
+            else
+              if [ -f "$artifact/wg-go-$platform_arch" ]; then
+                cp "$artifact/wg-go-$platform_arch" "release-assets/$platform_arch/wg-go"
+                chmod +x "release-assets/$platform_arch/wg-go"
+              fi
             fi
             
             # Copy wintun.dll for Windows builds
