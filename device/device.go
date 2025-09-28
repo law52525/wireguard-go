@@ -430,6 +430,11 @@ func (device *Device) SetDNSMonitorInterval(interval time.Duration) {
 	}
 }
 
+// GetDNSMonitor returns the DNS monitor instance
+func (device *Device) GetDNSMonitor() *DNSMonitor {
+	return device.dnsMonitor
+}
+
 // GetDNSMonitoredPeers returns information about peers being monitored for DNS changes
 func (device *Device) GetDNSMonitoredPeers() map[NoisePublicKey]*MonitoredPeerInfo {
 	if device.dnsMonitor != nil {

@@ -53,7 +53,7 @@ func monitorSpecificInterface(name string) {
 	info, err := getInterfaceInfo(name)
 	if err != nil {
 		fmt.Printf("❌ Error monitoring interface '%s': %v\n", name, err)
-		fmt.Printf("💡 Make sure the interface is running: sudo ./wireguard-go %s\n", name)
+		fmt.Printf("💡 Make sure the interface is running: %s\n", strings.Replace(getStartCommand(), "<interface-name>", name, 1))
 		return
 	}
 
@@ -70,7 +70,7 @@ func monitorAllInterfaces() {
 
 	if len(interfaces) == 0 {
 		fmt.Println("📭 No WireGuard interfaces found")
-		fmt.Println("💡 To create an interface: sudo ./wireguard-go <interface-name>")
+		fmt.Printf("💡 To create an interface: %s\n", getStartCommand())
 		return
 	}
 

@@ -18,11 +18,12 @@
 
 ### 特色功能
 - **🔧 wg-go 管理工具**: 自制的 Go 版本 WireGuard 管理工具
-- **🚀 自动化脚本**: 一键启动和停止脚本
+- **🚀 自动化脚本**: 一键启动和停止脚本 (支持 Windows/Linux/macOS)
 - **🌐 智能域名解析**: 自动将域名解析为 IP 地址
 - **🔄 动态 DNS 监控**: 自动监控域名端点的 IP 变化并重新连接
 - **🔑 智能密钥转换**: Base64 ↔ Hex 格式自动转换
 - **📊 实时监控**: 连接状态和流量统计的实时监控
+- **🖥️ 跨平台支持**: 完整支持 Windows、Linux、macOS
 
 ### 解决的问题
 1. **官方 wg 工具依赖**: 无需安装 wireguard-tools
@@ -89,18 +90,20 @@ ifconfig utun0 >/dev/null 2>&1 && echo "网络权限正常"
 ```
 
 ### 编译项目
+
+#### Linux/macOS 用户
 ```bash
 # 进入项目目录
 cd wireguard-go
 
 # 1. 编译 WireGuard 守护进程
-make
+make build
 # 或者使用 go build
-go build -o wireguard-go
+go build -o wireguard-go main.go
 
 # 2. 编译 wg-go 管理工具
 cd cmd/wg-go
-go build -o wg-go
+go build -o wg-go .
 cd ../..
 
 # 验证编译结果
@@ -108,16 +111,106 @@ cd ../..
 ls -la wireguard-go cmd/wg-go/wg-go
 ```
 
+#### Windows 用户
+```cmd
+REM 进入项目目录
+cd wireguard-go
+
+REM 1. 编译 WireGuard 守护进程
+go build -o wireguard-go.exe .
+
+REM 2. 编译 wg-go 管理工具
+cd cmd\wg-go
+go build -o wg-go.exe .
+cd ..\..
+
+REM 验证编译结果
+cmd\wg-go\wg-go.exe help
+dir wireguard-go.exe cmd\wg-go\wg-go.exe
+```
+
+#### 使用构建脚本
+
+**Linux/macOS 用户 (使用 Makefile):**
+```bash
+# 查看帮助
+make help
+
+# 构建当前平台
+make build
+
+# 构建所有平台
+make build-all
+
+# 构建命令行工具
+make build-tools
+
+# 清理
+make clean
+```
+
+**Windows 用户 (使用 build.bat):**
+```cmd
+REM 查看帮助
+build.bat help
+
+REM 构建当前平台 (Windows)
+build.bat build
+
+REM 构建所有平台
+build.bat build-all
+
+REM 构建命令行工具
+build.bat build-tools
+
+REM 清理
+build.bat clean
+```
+
+**Windows 用户 (使用 Make, 需要先安装):**
+```cmd
+REM 安装 Make (使用 Chocolatey)
+choco install make
+
+REM 或者使用 Scoop
+scoop install make
+
+REM 然后使用 Makefile
+make help
+make build
+```
+
 ---
 
 ## 🚀 快速开始
 
-### 1. 准备配置文件
+### Windows 用户 (推荐)
+
+1. **下载并安装 Go**: https://golang.org/dl/
+2. **克隆项目**: `git clone <your-repo> && cd wireguard-go`
+3. **运行测试**: `test-windows-support.bat` (以管理员身份运行)
+4. **快速启动**: `quick-start-windows.bat` (以管理员身份运行)
+5. **停止服务**: `stop-wireguard-windows.bat` (以管理员身份运行)
+
+**Windows 特性支持**:
+- ✅ **wg-go 命令行工具**: 完全支持 Windows 命名管道通信
+- ✅ **动态 DNS 监控**: 自动监控域名 IP 变化
+- ✅ **日志系统**: 支持文件输出和控制台输出
+- ✅ **UAPI 通信**: 使用 Windows 命名管道 (`\\.\pipe\wireguard\<interface>`)
+- ✅ **管理员权限**: 自动检测并提供权限提示
+- ⚠️ **网络配置**: 需要手动配置TUN接口IP地址和路由 (与官方WireGuard for Windows不同)
+
+### Windows 用户详细配置
+
+#### 重要说明
+WireGuard-Go在Windows上与官方WireGuard for Windows有一个重要区别：**不会自动配置TUN接口的IP地址和路由**。需要手动配置网络接口。
+
+#### 1. 准备配置文件
 
 编辑 `wg0.conf`:
 ```ini
 [Interface]
-# 生成命令: ./cmd/wg-go/wg-go genkey
+# 生成命令: ./cmd/wg-go/wg-go.exe genkey
 PrivateKey = YOUR_PRIVATE_KEY
 Address = 192.168.11.35/32
 DNS = 8.8.8.8
@@ -131,6 +224,89 @@ Endpoint = server.example.com:51820
 AllowedIPs = 192.168.11.0/24, 192.168.10.0/24
 PersistentKeepalive = 25
 ```
+
+#### 2. 生成密钥对
+```cmd
+REM 生成私钥
+cmd\wg-go\wg-go.exe genkey
+
+REM 生成对应的公钥
+echo PRIVATE_KEY | cmd\wg-go\wg-go.exe pubkey
+
+REM 生成预共享密钥
+cmd\wg-go\wg-go.exe genpsk
+```
+
+#### 3. 一键启动 (推荐)
+```cmd
+REM 以管理员身份运行
+quick-start-windows.bat
+```
+
+#### 4. 手动启动和配置
+```cmd
+REM 1. 启动WireGuard守护进程
+wireguard-go.exe wg0
+
+REM 2. 应用配置
+cmd\wg-go\wg-go.exe setconf wg0 wg0.conf
+
+REM 3. 手动配置网络接口 (重要!)
+REM 设置接口IP地址
+netsh interface ip set address "wg0" static 192.168.101.20 255.255.255.0
+
+REM 添加路由到对等网络
+route add 192.168.100.0 mask 255.255.255.0 192.168.101.20
+route add 192.168.101.0 mask 255.255.255.0 192.168.101.20
+
+REM 设置DNS服务器
+netsh interface ip set dns "wg0" static 8.8.8.8
+```
+
+#### 5. 验证连接
+```cmd
+REM 查看连接状态
+cmd\wg-go\wg-go.exe show wg0
+
+REM 检查网络接口
+ipconfig
+
+REM 检查路由表
+route print | findstr "192.168"
+
+REM 测试连通性
+ping 192.168.100.1
+```
+
+#### 6. 停止服务
+```cmd
+REM 自动停止 (推荐)
+stop-wireguard-windows.bat
+
+REM 手动停止
+REM 停止WireGuard进程
+taskkill /f /im wireguard-go.exe
+
+REM 清理路由
+route delete 192.168.100.0
+route delete 192.168.101.0
+
+REM 重置接口配置 (可选)
+netsh interface ip set address "wg0" dhcp
+netsh interface ip set dns "wg0" dhcp
+```
+
+**停止脚本功能**:
+- ✅ **自动停止进程**: 正常停止或强制停止WireGuard进程
+- ✅ **清理路由**: 自动删除对等网络路由
+- ✅ **接口重置**: 可选择重置wg0接口为DHCP模式
+- ✅ **状态检查**: 显示清理结果和接口状态
+
+### Linux/macOS 用户
+
+#### 1. 准备配置文件
+
+编辑 `wg0.conf`:
 
 ### 2. 生成密钥对
 ```bash

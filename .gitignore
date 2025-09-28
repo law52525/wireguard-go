@@ -1,5 +1,7 @@
 # 二进制可执行文件
 wireguard-go
+wireguard-go-linux
+wireguard-go-macos
 cmd/wg-go/wg-go
 
 # 敏感配置文件
@@ -31,3 +33,7 @@ Desktop.ini
 # 临时目录
 tmp/
 temp/
+
+# wintun.dll 文件
+wintun/
+*.dll
