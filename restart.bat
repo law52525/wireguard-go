@@ -70,40 +70,34 @@ if exist "%CONFIG_FILE%" (
             )
         )
     ) else (
-        echo %YELLOW%[WARN] No AllowedIPs found in configuration, using default networks%NC%
-        REM Fallback to default networks
-        route delete 192.168.100.0 >nul 2>&1
-        route delete 192.168.101.0 >nul 2>&1
+        echo %YELLOW%[WARN] No AllowedIPs found in configuration%NC%
     )
 ) else (
-    echo %YELLOW%[WARN] Configuration file %CONFIG_FILE% not found, using default networks%NC%
-    REM Fallback to default networks
-    route delete 192.168.100.0 >nul 2>&1
-    route delete 192.168.101.0 >nul 2>&1
+    echo %YELLOW%[WARN] Configuration file %CONFIG_FILE% not found%NC%
 )
 
 REM Step 3: Check and compile if necessary
 echo.
 echo %YELLOW%[STEP 3] Checking and compiling if necessary...%NC%
 
-REM Check Go environment
-go version >nul 2>&1
-if %errorLevel% neq 0 (
-    echo %RED%[ERROR] Go is not installed or not added to PATH%NC%
-    echo Please install Go first: https://golang.org/dl/
-    pause
-    exit /b 1
-)
-
-echo %GREEN%[OK] Go environment check passed%NC%
-
 REM Check if wireguard-go.exe exists
 if exist "wireguard-go.exe" (
     echo %GREEN%[INFO] wireguard-go.exe already exists, skipping compilation%NC%
 ) else (
+    REM Check Go environment before compiling
+    echo %YELLOW%[CHECK] Checking Go environment...%NC%
+    go version >nul 2>&1
+    if %errorLevel% neq 0 (
+        echo %RED%[ERROR] Go is not installed or not added to PATH%NC%
+        echo Please install Go first: https://golang.org/dl/
+        pause
+        exit /b 1
+    )
+    echo %GREEN%[OK] Go environment check passed%NC%
+    
     REM Compile program
     echo %YELLOW%[BUILD] Compiling WireGuard-Go...%NC%
-    call build.bat build
+    go build -o wireguard-go.exe .
     if %errorLevel% neq 0 (
         echo %RED%[ERROR] Compilation failed%NC%
         pause
@@ -119,6 +113,17 @@ if exist "wg-go.exe" (
     echo %GREEN%[INFO] wg-go.exe already exists in cmd\wg-go\, skipping compilation%NC%
     set "WG_GO_PATH=%WG_GO_PATH%"
 ) else (
+    REM Check Go environment before compiling
+    echo %YELLOW%[CHECK] Checking Go environment...%NC%
+    go version >nul 2>&1
+    if %errorLevel% neq 0 (
+        echo %RED%[ERROR] Go is not installed or not added to PATH%NC%
+        echo Please install Go first: https://golang.org/dl/
+        pause
+        exit /b 1
+    )
+    echo %GREEN%[OK] Go environment check passed%NC%
+    
     REM Compile command line tool
     echo %YELLOW%[BUILD] Compiling command line tool...%NC%
     cd cmd\wg-go

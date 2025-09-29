@@ -84,16 +84,10 @@ if exist "%CONFIG_FILE%" (
             )
         )
     ) else (
-        echo %YELLOW%[WARN] No AllowedIPs found in configuration, using default networks%NC%
-        REM Fallback to default networks
-        route delete 192.168.100.0 >nul 2>&1
-        route delete 192.168.101.0 >nul 2>&1
+        echo %YELLOW%[WARN] No AllowedIPs found in configuration%NC%
     )
 ) else (
-    echo %YELLOW%[WARN] Configuration file %CONFIG_FILE% not found, using default networks%NC%
-    REM Fallback to default networks
-    route delete 192.168.100.0 >nul 2>&1
-    route delete 192.168.101.0 >nul 2>&1
+    echo %YELLOW%[WARN] Configuration file %CONFIG_FILE% not found%NC%
 )
 
 REM Check and clean wg0 interface configuration
