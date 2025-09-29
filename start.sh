@@ -315,7 +315,6 @@ show_status() {
     echo
     echo "  停止服务: sudo pkill wireguard-go"
     echo
-    echo "📖 详细文档: 查看 WIREGUARD_GO_GUIDE.md"
 }
 
 # 主函数

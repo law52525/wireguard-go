@@ -400,7 +400,7 @@ show_final_status() {
     print_success "WireGuard 清理完成！"
     echo
     echo "📋 如需重新启动:"
-    echo "  sudo ./quick-start.sh"
+    echo "  sudo ./start.sh"
     echo
 }
 

@@ -66,8 +66,8 @@ if exist "%CONFIG_FILE%" (
     echo Reading configuration from %CONFIG_FILE%...
     
     REM Read AllowedIPs (peer networks)
-    for /f "tokens=2 delims== " %%a in ('findstr /r "^AllowedIPs" %CONFIG_FILE%') do (
-        set "ALLOWED_IPS=%%a"
+    for /f "tokens=1* delims== " %%a in ('findstr /r "^AllowedIPs" %CONFIG_FILE%') do (
+        set "ALLOWED_IPS=%%b"
     )
     
     if defined ALLOWED_IPS (

@@ -149,19 +149,12 @@ if not defined INTERFACE_IP (
 )
 
 REM Read AllowedIPs (peer networks)
-set "NETWORKS="
-for /f "tokens=2 delims== " %%a in ('findstr /r "^AllowedIPs" %CONFIG_FILE%') do (
-    set "ALLOWED_IPS=%%a"
+for /f "tokens=1* delims== " %%a in ('findstr /r "^AllowedIPs" %CONFIG_FILE%') do (
+    set "ALLOWED_IPS=%%b"
 )
 if not defined ALLOWED_IPS (
     echo %RED%[ERROR] No AllowedIPs found in configuration file%NC%
     exit /b 1
-)
-
-REM Parse AllowedIPs (comma-separated networks)
-set "NETWORKS="
-for %%i in (%ALLOWED_IPS%) do (
-    set "NETWORKS=!NETWORKS! %%i"
 )
 
 echo %GREEN%[INFO] Interface IP: %INTERFACE_IP%%NC%
