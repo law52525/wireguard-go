@@ -193,6 +193,45 @@ jobs:
             if [ -f "$artifact/wintun.dll" ] && [[ "$platform_arch" == windows-* ]]; then
               cp "$artifact/wintun.dll" "release-assets/$platform_arch/wintun.dll"
             fi
+            
+            # Copy platform-specific scripts
+            if [[ "$platform_arch" == windows-* ]]; then
+              # Windows scripts
+              if [ -f "start.bat" ]; then
+                cp "start.bat" "release-assets/$platform_arch/"
+              fi
+              if [ -f "restart.bat" ]; then
+                cp "restart.bat" "release-assets/$platform_arch/"
+              fi
+              if [ -f "stop.bat" ]; then
+                cp "stop.bat" "release-assets/$platform_arch/"
+              fi
+            else
+              # Linux/macOS scripts
+              if [ -f "start.sh" ]; then
+                cp "start.sh" "release-assets/$platform_arch/"
+                chmod +x "release-assets/$platform_arch/start.sh"
+              fi
+              if [ -f "restart.sh" ]; then
+                cp "restart.sh" "release-assets/$platform_arch/"
+                chmod +x "release-assets/$platform_arch/restart.sh"
+              fi
+              if [ -f "stop.sh" ]; then
+                cp "stop.sh" "release-assets/$platform_arch/"
+                chmod +x "release-assets/$platform_arch/stop.sh"
+              fi
+            fi
+            
+            # Copy common files
+            if [ -f "wg0.conf" ]; then
+              cp "wg0.conf" "release-assets/$platform_arch/"
+            fi
+            if [ -f "README.md" ]; then
+              cp "README.md" "release-assets/$platform_arch/"
+            fi
+            if [ -f "WIREGUARD_GO_GUIDE.md" ]; then
+              cp "WIREGUARD_GO_GUIDE.md" "release-assets/$platform_arch/"
+            fi
           fi
         done
         
@@ -218,35 +257,59 @@ jobs:
           - **macOS**: amd64, arm64
           - **Windows**: amd64, arm64 (includes wintun.dll)
           
-          ### Binaries included:
-          - `wireguard-go`: Userspace WireGuard daemon
-          - `wg-go`: WireGuard configuration management tool
+          ### Files included:
+          - `wireguard-go` / `wireguard-go.exe`: Userspace WireGuard daemon
+          - `wg-go` / `wg-go.exe`: WireGuard configuration management tool
+          - `wintun.dll`: Windows TUN driver (Windows only)
+          - `start.sh` / `start.bat`: Quick start script
+          - `restart.sh` / `restart.bat`: Restart script
+          - `stop.sh` / `stop.bat`: Stop script
+          - `wg0.conf`: Example configuration file
+          - `README.md`: Project documentation
+          - `WIREGUARD_GO_GUIDE.md`: Complete usage guide
           
-          ### Installation:
-          1. Download the appropriate archive for your platform
-          2. Extract the archive
-          3. Move the binaries to your PATH (e.g., `/usr/local/bin/`)
-          
-          ### Usage:
+          ### Quick Start:
           
           **Linux/macOS:**
           ```bash
-          # Start WireGuard daemon
-          ./wireguard-go wg0
+          # Extract and run
+          tar -xzf wireguard-go-linux-amd64.tar.gz
+          cd wireguard-go-linux-amd64
+
+          # Edit wg0.conf
+          nano wg0.conf
           
-          # Manage WireGuard configuration
+          # Quick start (recommended)
+          sudo ./start.sh
+          
+          # Management scripts
+          sudo ./restart.sh  # Restart WireGuard
+          sudo ./stop.sh     # Stop WireGuard
+          
+          # Or manual start
+          sudo ./wireguard-go wg0
           ./wg-go show
-          ./wg-go genkey
           ```
           
           **Windows:**
           ```cmd
-          # Start WireGuard daemon (run as Administrator)
-          wireguard-go.exe wg0
+          # Extract and run (as Administrator)
+          # Extract wireguard-go-windows-amd64.zip
+          cd wireguard-go-windows-amd64
+
+          # Edit wg0.conf
+          notepad wg0.conf
           
-          # Manage WireGuard configuration
+          # Quick start (recommended)
+          start.bat
+          
+          # Management scripts
+          restart.bat  # Restart WireGuard
+          stop.bat     # Stop WireGuard
+          
+          # Or manual start
+          wireguard-go.exe wg0
           wg-go.exe show
-          wg-go.exe genkey
           ```
           
           **Note:** Windows builds include `wintun.dll` which is required for TUN interface functionality.
