@@ -72,7 +72,6 @@ check_files() {
     
     if [[ ! -f "wg0.conf" ]]; then
         print_error "配置文件 wg0.conf 不存在"
-        echo "请创建配置文件，参考 COMPLETE_GUIDE.md"
         exit 1
     fi
     
@@ -252,19 +251,6 @@ verify_connection() {
     else
         echo "  无法检查路由（缺少网络工具）"
     fi
-    
-    # 尝试 ping 测试
-    print_info "测试网络连通性..."
-    if echo "$WG_STATUS" | grep -q "192.168.11"; then
-        # 使用兼容的 ping 参数（macOS 和 Linux）
-        if ping -c 1 -W 5 192.168.11.21 >/dev/null 2>&1; then
-            print_success "网络连通性测试成功！"
-        else
-            print_info "Ping 测试失败，但这可能是正常的（目标主机可能不响应 ping）"
-        fi
-    fi
-    
-    print_success "连接验证完成"
 }
 
 # 显示状态

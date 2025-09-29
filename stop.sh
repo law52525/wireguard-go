@@ -45,6 +45,33 @@ check_permissions() {
     fi
 }
 
+# 从配置文件读取网段信息
+read_config_networks() {
+    local config_file="wg0.conf"
+    
+    if [[ ! -f "$config_file" ]]; then
+        print_info "配置文件 $config_file 不存在，使用默认网段"
+        VPN_NETWORKS=("192.168.11.0/24" "192.168.10.0/24")
+        return
+    fi
+    
+    # 从 AllowedIPs 提取网络段
+    ALLOWED_IPS=$(grep "AllowedIPs" "$config_file" | cut -d'=' -f2 | tr -d ' ')
+    if [[ -z "$ALLOWED_IPS" ]]; then
+        print_info "未在配置文件中找到 AllowedIPs，使用默认网段"
+        VPN_NETWORKS=("192.168.11.0/24" "192.168.10.0/24")
+        return
+    fi
+    
+    # 分割多个网段（用逗号分隔）
+    IFS=',' read -ra VPN_NETWORKS <<< "$ALLOWED_IPS"
+    for i in "${!VPN_NETWORKS[@]}"; do
+        VPN_NETWORKS[$i]=$(echo "${VPN_NETWORKS[$i]}" | tr -d ' ')
+    done
+    
+    print_info "发现 VPN 网段: ${VPN_NETWORKS[*]}"
+}
+
 # 停止 WireGuard 进程
 stop_wireguard() {
     print_step "1. 停止 WireGuard 进程"
@@ -115,19 +142,33 @@ check_interfaces() {
 clean_routes() {
     print_step "3. 清理 VPN 路由"
     
+    # 从配置文件读取网段信息
+    read_config_networks
+    
     # 检查是否有 VPN 相关路由
     if command -v ip >/dev/null 2>&1; then
         # 使用 ip 命令（Linux）
-        VPN_ROUTES=$(ip route show | grep "192.168.1" || true)
+        print_info "检查 VPN 相关路由..."
+        FOUND_ROUTES=false
         
-        if [[ -n "$VPN_ROUTES" ]]; then
-            print_info "发现 VPN 相关路由:"
-            echo "$VPN_ROUTES"
-            
+        # 检查每个配置的网段
+        for network in "${VPN_NETWORKS[@]}"; do
+            if ip route show | grep "$network" >/dev/null 2>&1; then
+                if [[ "$FOUND_ROUTES" == false ]]; then
+                    print_info "发现 VPN 相关路由:"
+                    FOUND_ROUTES=true
+                fi
+                ip route show | grep "$network"
+            fi
+        done
+        
+        if [[ "$FOUND_ROUTES" == true ]]; then
             print_info "清理路由..."
-            # 删除常见的 VPN 路由
-            ip route del 192.168.11.0/24 2>/dev/null || true
-            ip route del 192.168.10.0/24 2>/dev/null || true
+            # 删除配置的 VPN 路由
+            for network in "${VPN_NETWORKS[@]}"; do
+                ip route del "$network" 2>/dev/null || true
+                print_info "删除路由: $network"
+            done
             
             # 检查是否还有全局 VPN 路由
             if ip route show | grep "0.0.0.0/1.*utun" >/dev/null 2>&1; then
@@ -142,16 +183,27 @@ clean_routes() {
         fi
     elif command -v netstat >/dev/null 2>&1; then
         # 使用 netstat 命令（macOS/传统系统）
-        VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
+        print_info "检查 VPN 相关路由..."
+        FOUND_ROUTES=false
         
-        if [[ -n "$VPN_ROUTES" ]]; then
-            print_info "发现 VPN 相关路由:"
-            echo "$VPN_ROUTES"
-            
+        # 检查每个配置的网段
+        for network in "${VPN_NETWORKS[@]}"; do
+            if netstat -rn | grep "$network" >/dev/null 2>&1; then
+                if [[ "$FOUND_ROUTES" == false ]]; then
+                    print_info "发现 VPN 相关路由:"
+                    FOUND_ROUTES=true
+                fi
+                netstat -rn | grep "$network"
+            fi
+        done
+        
+        if [[ "$FOUND_ROUTES" == true ]]; then
             print_info "清理路由..."
-            # 删除常见的 VPN 路由
-            route delete -net 192.168.11.0/24 2>/dev/null || true
-            route delete -net 192.168.10.0/24 2>/dev/null || true
+            # 删除配置的 VPN 路由
+            for network in "${VPN_NETWORKS[@]}"; do
+                route delete -net "$network" 2>/dev/null || true
+                print_info "删除路由: $network"
+            done
             
             # 检查是否还有全局 VPN 路由
             if netstat -rn | grep "0.0.0.0/1.*utun" >/dev/null 2>&1; then
@@ -232,20 +284,32 @@ verify_cleanup() {
     # 检查路由
     if command -v ip >/dev/null 2>&1; then
         # 使用 ip 命令（Linux）
-        VPN_ROUTES=$(ip route show | grep "192.168.1" || true)
-        if [[ -n "$VPN_ROUTES" ]]; then
-            print_info "⚠️  仍有 VPN 相关路由:"
-            echo "$VPN_ROUTES"
-        else
+        FOUND_ROUTES=false
+        for network in "${VPN_NETWORKS[@]}"; do
+            if ip route show | grep "$network" >/dev/null 2>&1; then
+                if [[ "$FOUND_ROUTES" == false ]]; then
+                    print_info "⚠️  仍有 VPN 相关路由:"
+                    FOUND_ROUTES=true
+                fi
+                ip route show | grep "$network"
+            fi
+        done
+        if [[ "$FOUND_ROUTES" == false ]]; then
             print_success "✅ VPN 路由已清理"
         fi
     elif command -v netstat >/dev/null 2>&1; then
         # 使用 netstat 命令（macOS/传统系统）
-        VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
-        if [[ -n "$VPN_ROUTES" ]]; then
-            print_info "⚠️  仍有 VPN 相关路由:"
-            echo "$VPN_ROUTES"
-        else
+        FOUND_ROUTES=false
+        for network in "${VPN_NETWORKS[@]}"; do
+            if netstat -rn | grep "$network" >/dev/null 2>&1; then
+                if [[ "$FOUND_ROUTES" == false ]]; then
+                    print_info "⚠️  仍有 VPN 相关路由:"
+                    FOUND_ROUTES=true
+                fi
+                netstat -rn | grep "$network"
+            fi
+        done
+        if [[ "$FOUND_ROUTES" == false ]]; then
             print_success "✅ VPN 路由已清理"
         fi
     else
@@ -302,18 +366,30 @@ show_final_status() {
     echo "🛣️  路由表 (VPN 相关):"
     if command -v ip >/dev/null 2>&1; then
         # 使用 ip 命令（Linux）
-        VPN_ROUTES=$(ip route show | grep "192.168.1" || true)
-        if [[ -n "$VPN_ROUTES" ]]; then
-            echo "$VPN_ROUTES"
-        else
+        FOUND_ROUTES=false
+        for network in "${VPN_NETWORKS[@]}"; do
+            if ip route show | grep "$network" >/dev/null 2>&1; then
+                if [[ "$FOUND_ROUTES" == false ]]; then
+                    FOUND_ROUTES=true
+                fi
+                ip route show | grep "$network"
+            fi
+        done
+        if [[ "$FOUND_ROUTES" == false ]]; then
             echo "  没有 VPN 相关路由"
         fi
     elif command -v netstat >/dev/null 2>&1; then
         # 使用 netstat 命令（macOS/传统系统）
-        VPN_ROUTES=$(netstat -rn | grep "192.168.1" || true)
-        if [[ -n "$VPN_ROUTES" ]]; then
-            echo "$VPN_ROUTES"
-        else
+        FOUND_ROUTES=false
+        for network in "${VPN_NETWORKS[@]}"; do
+            if netstat -rn | grep "$network" >/dev/null 2>&1; then
+                if [[ "$FOUND_ROUTES" == false ]]; then
+                    FOUND_ROUTES=true
+                fi
+                netstat -rn | grep "$network"
+            fi
+        done
+        if [[ "$FOUND_ROUTES" == false ]]; then
             echo "  没有 VPN 相关路由"
         fi
     else
@@ -326,7 +402,6 @@ show_final_status() {
     echo "📋 如需重新启动:"
     echo "  sudo ./quick-start.sh"
     echo
-    echo "📖 详细文档: 查看 COMPLETE_GUIDE.md"
 }
 
 # 主函数
@@ -334,6 +409,7 @@ main() {
     print_header
     
     check_permissions
+    read_config_networks  # 读取配置文件中的网段信息
     stop_wireguard
     check_interfaces
     clean_routes

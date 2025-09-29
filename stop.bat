@@ -60,20 +60,40 @@ echo %YELLOW%[CLEANUP] Cleaning up resources...%NC%
 REM Clean network configuration (Windows-specific steps)
 echo %YELLOW%[NETWORK] Cleaning network configuration...%NC%
 
-REM Clean routes to peer networks
-echo Cleaning route configuration...
-route delete 192.168.100.0 >nul 2>&1
-if %errorLevel% == 0 (
-    echo %GREEN%[OK] Route 192.168.100.0/24 cleaned%NC%
+REM Read configuration from wg0.conf
+set "CONFIG_FILE=wg0.conf"
+if exist "%CONFIG_FILE%" (
+    echo Reading configuration from %CONFIG_FILE%...
+    
+    REM Read AllowedIPs (peer networks)
+    for /f "tokens=2 delims== " %%a in ('findstr /r "^AllowedIPs" %CONFIG_FILE%') do (
+        set "ALLOWED_IPS=%%a"
+    )
+    
+    if defined ALLOWED_IPS (
+        echo %GREEN%[INFO] Found peer networks: %ALLOWED_IPS%%NC%
+        
+        REM Clean routes for each network in AllowedIPs
+        for %%i in (%ALLOWED_IPS%) do (
+            echo Cleaning route for %%i...
+            route delete %%i >nul 2>&1
+            if !errorLevel! == 0 (
+                echo %GREEN%[OK] Route %%i cleaned%NC%
+            ) else (
+                echo %YELLOW%[INFO] Route %%i does not exist or already cleaned%NC%
+            )
+        )
+    ) else (
+        echo %YELLOW%[WARN] No AllowedIPs found in configuration, using default networks%NC%
+        REM Fallback to default networks
+        route delete 192.168.100.0 >nul 2>&1
+        route delete 192.168.101.0 >nul 2>&1
+    )
 ) else (
-    echo %YELLOW%[INFO] Route 192.168.100.0/24 does not exist or already cleaned%NC%
-)
-
-route delete 192.168.101.0 >nul 2>&1
-if %errorLevel% == 0 (
-    echo %GREEN%[OK] Route 192.168.101.0/24 cleaned%NC%
-) else (
-    echo %YELLOW%[INFO] Route 192.168.101.0/24 does not exist or already cleaned%NC%
+    echo %YELLOW%[WARN] Configuration file %CONFIG_FILE% not found, using default networks%NC%
+    REM Fallback to default networks
+    route delete 192.168.100.0 >nul 2>&1
+    route delete 192.168.101.0 >nul 2>&1
 )
 
 REM Check and clean wg0 interface configuration

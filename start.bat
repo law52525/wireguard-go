@@ -51,7 +51,7 @@ if exist "wireguard-go.exe" (
 ) else (
     REM Compile program
     echo %YELLOW%[BUILD] Compiling WireGuard-Go...%NC%
-    call build.bat build
+    go build -o wireguard-go.exe .
     if %errorLevel% neq 0 (
         echo %RED%[ERROR] Compilation failed%NC%
         pause
@@ -136,12 +136,43 @@ REM Configure network interface (Windows-specific steps)
 echo %YELLOW%[NETWORK] Configuring network interface...%NC%
 echo Note: WireGuard-Go on Windows requires manual configuration of TUN interface IP and routes
 
-REM Read IP address from config file (simplified version, assuming 192.168.101.20)
-set "INTERFACE_IP=192.168.101.20"
-set "INTERFACE_MASK=255.255.255.0"
+REM Read configuration from wg0.conf
+echo Reading configuration from %CONFIG_FILE%...
 
-echo Setting interface %INTERFACE_NAME% IP address to %INTERFACE_IP%...
-netsh interface ip set address "%INTERFACE_NAME%" static %INTERFACE_IP% %INTERFACE_MASK%
+REM Read Address (interface IP)
+for /f "tokens=2 delims== " %%a in ('findstr /r "^Address" %CONFIG_FILE%') do (
+    set "INTERFACE_IP=%%a"
+)
+if not defined INTERFACE_IP (
+    echo %RED%[ERROR] No Address found in configuration file%NC%
+    exit /b 1
+)
+
+REM Read AllowedIPs (peer networks)
+set "NETWORKS="
+for /f "tokens=2 delims== " %%a in ('findstr /r "^AllowedIPs" %CONFIG_FILE%') do (
+    set "ALLOWED_IPS=%%a"
+)
+if not defined ALLOWED_IPS (
+    echo %RED%[ERROR] No AllowedIPs found in configuration file%NC%
+    exit /b 1
+)
+
+REM Parse AllowedIPs (comma-separated networks)
+set "NETWORKS="
+for %%i in (%ALLOWED_IPS%) do (
+    set "NETWORKS=!NETWORKS! %%i"
+)
+
+echo %GREEN%[INFO] Interface IP: %INTERFACE_IP%%NC%
+echo %GREEN%[INFO] Peer networks: %ALLOWED_IPS%%NC%
+
+REM Extract IP and mask from interface IP (assuming /32 format)
+for /f "tokens=1 delims=/" %%a in ("%INTERFACE_IP%") do set "INTERFACE_IP_ONLY=%%a"
+set "INTERFACE_MASK=255.255.255.255"
+
+echo Setting interface %INTERFACE_NAME% IP address to %INTERFACE_IP_ONLY%...
+netsh interface ip set address "%INTERFACE_NAME%" static %INTERFACE_IP_ONLY% %INTERFACE_MASK%
 if %errorLevel% equ 0 (
     echo %GREEN%[OK] Interface IP address set successfully%NC%
 ) else (
@@ -149,17 +180,20 @@ if %errorLevel% equ 0 (
     echo Please check interface name and permissions
 )
 
-
 REM Add routes to peer networks
 echo Adding routes to peer networks...
 echo Waiting 5 seconds for interface to stabilize...
 timeout /t 5 /nobreak >nul
-REM Use interface name instead of IP for routing
-route add 192.168.100.0 mask 255.255.255.0 %INTERFACE_IP%
-if %errorLevel% equ 0 (
-    echo %GREEN%[OK] Route 192.168.100.0/24 added successfully%NC%
-) else (
-    echo %YELLOW%[WARN] Route 192.168.100.0/24 may already exist%NC%
+
+REM Add routes for each network in AllowedIPs
+for %%i in (%ALLOWED_IPS%) do (
+    echo Adding route for %%i...
+    route add %%i mask 255.255.255.0 %INTERFACE_IP_ONLY%
+    if !errorLevel! equ 0 (
+        echo %GREEN%[OK] Route %%i added successfully%NC%
+    ) else (
+        echo %YELLOW%[WARN] Route %%i may already exist%NC%
+    )
 )
 
 REM Set DNS server

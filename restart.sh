@@ -45,6 +45,39 @@ check_permissions() {
     fi
 }
 
+# 从配置文件读取网段信息
+read_config_networks() {
+    local config_file="wg0.conf"
+    
+    if [[ ! -f "$config_file" ]]; then
+        print_error "配置文件 $config_file 不存在"
+        exit 1
+    fi
+    
+    # 从配置文件提取 IP 地址
+    VPN_IP=$(grep "Address" "$config_file" | cut -d'=' -f2 | tr -d ' ' | cut -d'/' -f1)
+    if [[ -z "$VPN_IP" ]]; then
+        print_error "无法从配置文件提取 IP 地址"
+        exit 1
+    fi
+    
+    # 从 AllowedIPs 提取网络段
+    ALLOWED_IPS=$(grep "AllowedIPs" "$config_file" | cut -d'=' -f2 | tr -d ' ')
+    if [[ -z "$ALLOWED_IPS" ]]; then
+        print_error "无法从配置文件提取 AllowedIPs"
+        exit 1
+    fi
+    
+    # 分割多个网段（用逗号分隔）
+    IFS=',' read -ra VPN_NETWORKS <<< "$ALLOWED_IPS"
+    for i in "${!VPN_NETWORKS[@]}"; do
+        VPN_NETWORKS[$i]=$(echo "${VPN_NETWORKS[$i]}" | tr -d ' ')
+    done
+    
+    print_info "将使用接口 IP: $VPN_IP"
+    print_info "发现 VPN 网段: ${VPN_NETWORKS[*]}"
+}
+
 # 停止现有的 WireGuard 进程
 stop_wireguard() {
     print_step "1. 停止现有的 WireGuard 进程"
@@ -79,15 +112,19 @@ stop_wireguard() {
         # 使用 ip 命令（Linux）
         if ip link show utun11 >/dev/null 2>&1; then
             print_info "清理网络路由..."
-            ip route del 192.168.11.0/24 2>/dev/null || true
-            ip route del 192.168.10.0/24 2>/dev/null || true
+            for network in "${VPN_NETWORKS[@]}"; do
+                ip route del "$network" 2>/dev/null || true
+                print_info "删除路由: $network"
+            done
         fi
     elif command -v ifconfig >/dev/null 2>&1; then
         # 使用 ifconfig 命令（macOS/传统系统）
         if ifconfig utun11 >/dev/null 2>&1; then
             print_info "清理网络路由..."
-            route delete -net 192.168.11.0/24 2>/dev/null || true
-            route delete -net 192.168.10.0/24 2>/dev/null || true
+            for network in "${VPN_NETWORKS[@]}"; do
+                route delete -net "$network" 2>/dev/null || true
+                print_info "删除路由: $network"
+            done
         fi
     fi
 }
@@ -153,7 +190,7 @@ start_wireguard() {
 configure_network() {
     print_step "3. 配置网络接口"
     
-    print_info "配置接口 IP: 192.168.11.35"
+    print_info "配置接口 IP: $VPN_IP"
     # 使用 ip 命令（现代 Linux 系统）或 ifconfig（macOS/传统系统）
     if command -v ip >/dev/null 2>&1; then
         # 使用 ip 命令（Linux）
@@ -164,17 +201,17 @@ configure_network() {
             print_error "接口 utun11 启动失败"
         fi
         # 然后配置 IP
-        if ip addr add 192.168.11.35/32 dev utun11 2>/dev/null; then
-            print_success "IP 地址配置成功: 192.168.11.35"
+        if ip addr add "$VPN_IP/32" dev utun11 2>/dev/null; then
+            print_success "IP 地址配置成功: $VPN_IP"
         else
-            print_error "IP 地址配置失败: 192.168.11.35"
+            print_error "IP 地址配置失败: $VPN_IP"
         fi
     elif command -v ifconfig >/dev/null 2>&1; then
         # 使用 ifconfig 命令（macOS/传统系统）
-        if ifconfig utun11 inet 192.168.11.35 192.168.11.35 netmask 255.255.255.255 2>/dev/null; then
-            print_success "IP 地址配置成功: 192.168.11.35"
+        if ifconfig utun11 inet "$VPN_IP" "$VPN_IP" netmask 255.255.255.255 2>/dev/null; then
+            print_success "IP 地址配置成功: $VPN_IP"
         else
-            print_error "IP 地址配置失败: 192.168.11.35"
+            print_error "IP 地址配置失败: $VPN_IP"
         fi
     fi
     
@@ -182,28 +219,22 @@ configure_network() {
     # 使用 ip 命令（现代 Linux 系统）或 route 命令（macOS/传统系统）
     if command -v ip >/dev/null 2>&1; then
         # 使用 ip 命令（Linux）
-        if ip route add 192.168.11.0/24 dev utun11 2>/dev/null; then
-            print_success "路由添加成功: 192.168.11.0/24"
-        else
-            print_error "路由添加失败: 192.168.11.0/24"
-        fi
-        if ip route add 192.168.10.0/24 dev utun11 2>/dev/null; then
-            print_success "路由添加成功: 192.168.10.0/24"
-        else
-            print_error "路由添加失败: 192.168.10.0/24"
-        fi
+        for network in "${VPN_NETWORKS[@]}"; do
+            if ip route add "$network" dev utun11 2>/dev/null; then
+                print_success "路由添加成功: $network"
+            else
+                print_error "路由添加失败: $network"
+            fi
+        done
     elif command -v route >/dev/null 2>&1; then
         # 使用 route 命令（macOS/传统系统）
-        if route add -net 192.168.11.0/24 -interface utun11 2>/dev/null; then
-            print_success "路由添加成功: 192.168.11.0/24"
-        else
-            print_error "路由添加失败: 192.168.11.0/24"
-        fi
-        if route add -net 192.168.10.0/24 -interface utun11 2>/dev/null; then
-            print_success "路由添加成功: 192.168.10.0/24"
-        else
-            print_error "路由添加失败: 192.168.10.0/24"
-        fi
+        for network in "${VPN_NETWORKS[@]}"; do
+            if route add -net "$network" -interface utun11 2>/dev/null; then
+                print_success "路由添加成功: $network"
+            else
+                print_error "路由添加失败: $network"
+            fi
+        done
     fi
     
     print_success "网络配置完成"
@@ -251,17 +282,6 @@ verify_connection() {
         print_error "WireGuard 状态异常"
         exit 1
     fi
-    
-    # 测试网络连通性
-    print_info "测试网络连通性..."
-    # 使用兼容的 ping 参数（macOS 和 Linux）
-    if ping -c 1 -W 5 192.168.11.21 >/dev/null 2>&1; then
-        print_success "网络连通性测试成功！"
-    else
-        print_info "网络连通性测试未通过，可能目标不在线"
-    fi
-    
-    print_success "连接验证完成"
 }
 
 # 显示状态
@@ -298,6 +318,7 @@ main() {
     print_header
     
     check_permissions
+    read_config_networks  # 读取配置文件中的网段信息
     check_files
     stop_wireguard
     start_wireguard
