@@ -264,7 +264,6 @@ jobs:
           - `start.sh` / `start.bat`: Quick start script
           - `restart.sh` / `restart.bat`: Restart script
           - `stop.sh` / `stop.bat`: Stop script
-          - `wg0.conf`: Example configuration file
           - `README.md`: Project documentation
           - `wg0.conf.example`: Example configuration file
           
