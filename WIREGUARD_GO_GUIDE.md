@@ -230,25 +230,36 @@ dir wireguard-go.exe cmd\wg-go\wg-go.exe wintun.dll
 
 ### Windows 特殊依赖
 
-#### wintun.dll 下载和配置
+#### wintun.dll 下载和配置 (仅 Windows)
+
+**Windows 用户:**
+```cmd
+REM 使用批处理脚本下载 (推荐)
+download-wintun.bat
+
+REM 脚本会自动：
+REM 1. 下载 wintun-0.14.1.zip
+REM 2. 解压到 wintun\ 目录
+REM 3. 根据当前系统架构复制对应的 wintun.dll 到当前目录
+REM 4. 确保 wintun.dll 与 wireguard-go.exe 在同一目录
+```
+
+**手动下载和配置 (仅 Windows):**
+```cmd
+REM 1. 访问 https://www.wintun.net/builds/wintun-0.14.1.zip
+REM 2. 解压到 wintun\ 目录
+REM 3. 根据系统架构复制对应的 wintun.dll：
+
+REM    - amd64:  copy wintun\wintun\bin\amd64\wintun.dll .
+REM    - arm64:  copy wintun\wintun\bin\arm64\wintun.dll .
+REM    - x86:    copy wintun\wintun\bin\x86\wintun.dll .
+REM    - arm:    copy wintun\wintun\bin\arm\wintun.dll .
+```
+
+**Linux/macOS 用户:**
 ```bash
-# 使用脚本下载 (推荐)
-./download-wintun.sh
-
-# 脚本会自动：
-# 1. 下载 wintun-0.14.1.zip
-# 2. 解压到 wintun/ 目录
-# 3. 根据当前系统架构复制对应的 wintun.dll 到当前目录
-# 4. 确保 wintun.dll 与 wireguard-go.exe 在同一目录
-
-# 或手动下载和配置
-# 1. 访问 https://www.wintun.net/builds/wintun-0.14.1.zip
-# 2. 解压到 wintun/ 目录
-# 3. 根据系统架构复制对应的 wintun.dll：
-#    - x86_64: cp wintun/wintun/bin/amd64/wintun.dll .
-#    - arm64:  cp wintun/wintun/bin/arm64/wintun.dll .
-#    - i386:   cp wintun/wintun/bin/x86/wintun.dll .
-#    - arm:    cp wintun/wintun/bin/arm/wintun.dll .
+# Linux/macOS 不需要 wintun.dll
+# 直接编译即可，无需额外依赖
 ```
 
 ---
@@ -267,7 +278,11 @@ git clone https://github.com/law52525/wireguard-go.git
 cd wireguard-go
 
 REM 3. 下载 Windows 依赖 (自动复制对应架构的 wintun.dll)
+REM 方法一：使用 Makefile (推荐)
 make download-wintun
+
+REM 方法二：直接使用批处理脚本
+REM download-wintun.bat
 ```
 
 #### 2. 一键启动 (推荐)
@@ -315,7 +330,7 @@ WireGuard-Go在Windows上与官方WireGuard for Windows有一个重要区别：*
 [Interface]
 # 生成命令: ./cmd/wg-go/wg-go.exe genkey
 PrivateKey = YOUR_PRIVATE_KEY
-Address = 192.168.11.35/32
+Address = 192.168.2.10/32
 DNS = 8.8.8.8
 MTU = 1420
 
@@ -324,7 +339,7 @@ PublicKey = SERVER_PUBLIC_KEY
 # 支持域名，会自动解析为 IP 并监控 IP 变化
 # 当域名的 IP 地址变化时，会自动重新连接
 Endpoint = server.example.com:51820
-AllowedIPs = 192.168.11.0/24, 192.168.10.0/24
+AllowedIPs = 192.168.2.0/24, 192.168.1.0/24
 PersistentKeepalive = 25
 ```
 
@@ -356,11 +371,11 @@ cmd\wg-go\wg-go.exe setconf wg0 wg0.conf
 
 REM 3. 手动配置网络接口 (重要!)
 REM 设置接口IP地址
-netsh interface ip set address "wg0" static 192.168.101.20 255.255.255.0
+netsh interface ip set address "wg0" static 192.168.2.10 255.255.255.0
 
 REM 添加路由到对等网络
-route add 192.168.100.0 mask 255.255.255.0 192.168.101.20
-route add 192.168.101.0 mask 255.255.255.0 192.168.101.20
+route add 192.168.1.0 mask 255.255.255.0 192.168.2.10
+route add 192.168.2.0 mask 255.255.255.0 192.168.2.10
 
 REM 设置DNS服务器
 netsh interface ip set dns "wg0" static 8.8.8.8
@@ -378,7 +393,7 @@ REM 检查路由表
 route print | findstr "192.168"
 
 REM 测试连通性
-ping 192.168.100.1
+ping 192.168.2.1
 ```
 
 #### 6. 停止服务
@@ -391,8 +406,8 @@ REM 停止WireGuard进程
 taskkill /f /im wireguard-go.exe
 
 REM 清理路由
-route delete 192.168.100.0
-route delete 192.168.101.0
+route delete 192.168.1.0
+route delete 192.168.2.0
 
 REM 重置接口配置 (可选)
 netsh interface ip set address "wg0" dhcp
@@ -422,6 +437,11 @@ brew install go
 # 2. 克隆项目
 git clone https://github.com/law52525/wireguard-go.git
 cd wireguard-go
+
+# 3. 编译项目 (Linux/macOS 无需额外依赖)
+make build
+# 或
+go build -o wireguard-go .
 ```
 
 #### 2. 一键启动 (推荐)
@@ -466,7 +486,7 @@ echo "公钥: $PUBLIC_KEY"
 sudo ./cmd/wg-go/wg-go show wg0
 
 # 测试网络连通性
-ping -c 3 192.168.11.21
+ping -c 3 192.168.2.1
 
 # 实时监控
 sudo ./cmd/wg-go/wg-go monitor wg0
@@ -490,7 +510,7 @@ sudo ./cmd/wg-go/wg-go monitor wg0
 ```ini
 [Interface]
 PrivateKey = base64_encoded_private_key    # 必需: 本地私钥
-Address = 192.168.11.35/32                # 必需: 本地 VPN IP
+Address = 192.168.2.10/32                # 必需: 本地 VPN IP
 ListenPort = 51820                        # 可选: 监听端口 (默认随机)
 DNS = 8.8.8.8, 1.1.1.1                   # 可选: DNS 服务器
 MTU = 1420                                # 可选: 最大传输单元
@@ -501,7 +521,7 @@ MTU = 1420                                # 可选: 最大传输单元
 [Peer]
 PublicKey = base64_encoded_public_key      # 必需: 对端公钥
 Endpoint = server.com:51820               # 可选: 服务器地址 (支持域名)
-AllowedIPs = 192.168.11.0/24             # 必需: 允许的 IP 范围
+AllowedIPs = 192.168.2.0/24             # 必需: 允许的 IP 范围
 PresharedKey = base64_encoded_psk         # 可选: 预共享密钥
 PersistentKeepalive = 25                  # 可选: 保活间隔 (秒)
 ```
@@ -523,8 +543,8 @@ ifconfig utun11
 sudo route add -net NETWORK/CIDR -interface utun11
 
 # 示例: 添加多个网络
-sudo route add -net 192.168.11.0/24 -interface utun11
-sudo route add -net 192.168.10.0/24 -interface utun11
+sudo route add -net 192.168.2.0/24 -interface utun11
+sudo route add -net 192.168.1.0/24 -interface utun11
 
 # 查看路由表
 netstat -rn | grep utun11
@@ -565,13 +585,13 @@ sudo ./cmd/wg-go/wg-go monitor
 #### 2. 连接测试
 ```bash
 # 测试到 VPN 网络的连通性
-ping -c 3 192.168.11.1
+ping -c 3 192.168.2.1
 
 # 测试特定主机
-ping -c 3 192.168.11.21
+ping -c 3 192.168.2.21
 
 # 网络扫描 (如果可用)
-nmap -sn 192.168.11.0/24
+nmap -sn 192.168.2.0/24
 ```
 
 #### 3. 流量统计
@@ -766,10 +786,10 @@ nslookup SERVER_DOMAIN
 ```bash
 # 问题: 无法访问 VPN 网络
 # 检查: 路由表
-netstat -rn | grep 192.168.1
+netstat -rn | grep 192.168.
 
 # 修复: 重新添加路由
-sudo route add -net 192.168.11.0/24 -interface utun11
+sudo route add -net 192.168.2.0/24 -interface utun11
 ```
 
 ### 调试技巧
@@ -803,7 +823,7 @@ sudo ./cmd/wg-go/wg-go show utun11
 netstat -rn | grep utun11
 
 # 5. 测试连通性
-ping -c 1 192.168.11.21
+ping -c 1 192.168.2.1
 ```
 
 ---

@@ -93,10 +93,16 @@ deps:
 	@go mod download
 	@echo "✅ Dependencies installed"
 
-# 下载 wintun.dll
+# 下载 wintun.dll (仅 Windows)
 download-wintun:
 	@echo "📥 Downloading wintun.dll for Windows development..."
-	@./download-wintun.sh
+ifeq ($(OS),windows)
+	@download-wintun.bat
+else
+	@echo "❌ wintun.dll is only required for Windows"
+	@echo "Linux/macOS users can skip this step"
+	@echo "Use 'make build' to compile for your platform"
+endif
 
 # 帮助
 help:
@@ -109,7 +115,7 @@ help:
 	@echo "  build-macos      - Build for macOS"
 	@echo "  build-all        - Build for all platforms"
 	@echo "  build-tools      - Build command line tools"
-	@echo "  download-wintun  - Download wintun.dll for Windows"
+	@echo "  download-wintun  - Download wintun.dll for Windows (Windows only)"
 	@echo "  clean            - Clean build artifacts"
 	@echo "  test             - Run tests"
 	@echo "  deps             - Install dependencies"
