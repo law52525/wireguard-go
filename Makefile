@@ -44,9 +44,11 @@ build-linux:
 build-windows:
 	@echo "🪟 Building for Windows..."
 	@GOOS=windows GOARCH=amd64 go build -o wireguard-go-windows.exe .
-	@if [ -f "wintun/wintun/bin/amd64/wintun.dll" ]; then \
-		echo "📦 Copying wintun.dll for amd64..."; \
-		cp wintun/wintun/bin/amd64/wintun.dll .; \
+	@echo "📦 Copying wintun.dll for current architecture..."
+	@if [ -f "wintun.dll" ]; then \
+		echo "✅ wintun.dll already exists in current directory"; \
+	else \
+		echo "⚠️  wintun.dll not found, please run 'make download-wintun' first"; \
 	fi
 	@echo "✅ Windows build completed: wireguard-go-windows.exe"
 

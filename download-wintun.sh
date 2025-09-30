@@ -40,6 +40,42 @@ if [ -d "wintun/bin" ]; then
     echo "  - arm64: wintun/bin/arm64/wintun.dll"
     echo "  - 386:   wintun/bin/x86/wintun.dll"
     echo "  - arm:   wintun/bin/arm/wintun.dll"
+    
+    # Copy wintun.dll to current directory based on system architecture
+    echo
+    echo -e "${YELLOW}📋 Copying wintun.dll to current directory...${NC}"
+    
+    # Detect system architecture
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)
+            WINTUN_ARCH="amd64"
+            ;;
+        aarch64|arm64)
+            WINTUN_ARCH="arm64"
+            ;;
+        i386|i686)
+            WINTUN_ARCH="x86"
+            ;;
+        armv7l|armv6l)
+            WINTUN_ARCH="arm"
+            ;;
+        *)
+            echo -e "${YELLOW}⚠️  Unknown architecture: $ARCH, defaulting to amd64${NC}"
+            WINTUN_ARCH="amd64"
+            ;;
+    esac
+    
+    echo "Detected architecture: $ARCH -> $WINTUN_ARCH"
+    
+    # Copy the appropriate wintun.dll
+    if [ -f "wintun/bin/$WINTUN_ARCH/wintun.dll" ]; then
+        cp "wintun/bin/$WINTUN_ARCH/wintun.dll" "../wintun.dll"
+        echo -e "${GREEN}✅ Copied wintun.dll for $WINTUN_ARCH to current directory${NC}"
+    else
+        echo -e "${RED}❌ wintun.dll for $WINTUN_ARCH not found${NC}"
+        exit 1
+    fi
 else
     echo -e "${RED}❌ Failed to extract wintun.dll${NC}"
     exit 1

@@ -225,20 +225,30 @@ cd ..\..
 
 REM 验证编译结果
 cmd\wg-go\wg-go.exe help
-dir wireguard-go.exe cmd\wg-go\wg-go.exe
+dir wireguard-go.exe cmd\wg-go\wg-go.exe wintun.dll
 ```
 
 ### Windows 特殊依赖
 
-#### wintun.dll 下载
+#### wintun.dll 下载和配置
 ```bash
 # 使用脚本下载 (推荐)
 ./download-wintun.sh
 
-# 或手动下载
+# 脚本会自动：
+# 1. 下载 wintun-0.14.1.zip
+# 2. 解压到 wintun/ 目录
+# 3. 根据当前系统架构复制对应的 wintun.dll 到当前目录
+# 4. 确保 wintun.dll 与 wireguard-go.exe 在同一目录
+
+# 或手动下载和配置
 # 1. 访问 https://www.wintun.net/builds/wintun-0.14.1.zip
 # 2. 解压到 wintun/ 目录
-# 3. 确保 wintun/bin/amd64/wintun.dll 存在
+# 3. 根据系统架构复制对应的 wintun.dll：
+#    - x86_64: cp wintun/wintun/bin/amd64/wintun.dll .
+#    - arm64:  cp wintun/wintun/bin/arm64/wintun.dll .
+#    - i386:   cp wintun/wintun/bin/x86/wintun.dll .
+#    - arm:    cp wintun/wintun/bin/arm/wintun.dll .
 ```
 
 ---
@@ -256,7 +266,7 @@ REM 2. 克隆项目
 git clone https://github.com/law52525/wireguard-go.git
 cd wireguard-go
 
-REM 3. 下载 Windows 依赖
+REM 3. 下载 Windows 依赖 (自动复制对应架构的 wintun.dll)
 make download-wintun
 ```
 
