@@ -229,8 +229,8 @@ jobs:
             if [ -f "README.md" ]; then
               cp "README.md" "release-assets/$platform_arch/"
             fi
-            if [ -f "WIREGUARD_GO_GUIDE.md" ]; then
-              cp "WIREGUARD_GO_GUIDE.md" "release-assets/$platform_arch/"
+            if [ -f "wg0.conf.example" ]; then
+              cp "wg0.conf.example" "release-assets/$platform_arch/"
             fi
           fi
         done
@@ -266,7 +266,7 @@ jobs:
           - `stop.sh` / `stop.bat`: Stop script
           - `wg0.conf`: Example configuration file
           - `README.md`: Project documentation
-          - `WIREGUARD_GO_GUIDE.md`: Complete usage guide
+          - `wg0.conf.example`: Example configuration file
           
           ### Quick Start:
           

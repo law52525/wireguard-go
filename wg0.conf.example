@@ -1,0 +1,10 @@
+[Interface]
+PrivateKey = YOUR_PRIVATE_KEY
+Address = 192.168.2.10/32
+DNS = 8.8.8.8
+
+[Peer]
+PublicKey = SERVER_PUBLIC_KEY
+Endpoint = server.example.com:51820  # 支持域名
+AllowedIPs = 192.168.2.0/24, 192.168.1.0/24
+PersistentKeepalive = 25
