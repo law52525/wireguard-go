@@ -1,18 +1,10 @@
 @echo off
-REM WireGuard-Go Windows 构建脚本
-REM 替代 Makefile 的功能
+REM WireGuard-Go Windows Build Script
+REM Alternative to Makefile functionality
 
 setlocal enabledelayedexpansion
 
-REM 设置颜色
-for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
-set "GREEN=%ESC%[32m"
-set "RED=%ESC%[31m"
-set "YELLOW=%ESC%[33m"
-set "BLUE=%ESC%[34m"
-set "NC=%ESC%[0m"
-
-REM 检查参数
+REM Check parameters
 if "%1"=="" goto :help
 if "%1"=="help" goto :help
 if "%1"=="build" goto :build
@@ -24,112 +16,112 @@ if "%1"=="deps" goto :deps
 goto :help
 
 :help
-echo %BLUE%WireGuard-Go Windows 构建脚本%NC%
-echo %BLUE%==============================%NC%
+echo WireGuard-Go Windows Build Script
+echo ==================================
 echo.
-echo 可用命令:
-echo   build         - 构建当前平台 (Windows)
-echo   build-all     - 构建所有平台
-echo   build-tools   - 构建命令行工具
-echo   clean         - 清理构建文件
-echo   test          - 运行测试
-echo   deps          - 安装依赖
-echo   help          - 显示此帮助
+echo Available commands:
+echo   build         - Build current platform (Windows)
+echo   build-all     - Build all platforms
+echo   build-tools   - Build command line tools
+echo   clean         - Clean build files
+echo   test          - Run tests
+echo   deps          - Install dependencies
+echo   help          - Show this help
 echo.
-echo 使用示例:
+echo Usage examples:
 echo   build.bat build
 echo   build.bat build-all
 echo   build.bat clean
 goto :end
 
 :build
-echo %YELLOW%🔨 构建 Windows 版本...%NC%
+echo [INFO] Building Windows version...
 go build -o wireguard-go.exe .
 if %errorLevel% equ 0 (
-    echo %GREEN%✅ Windows 构建完成: wireguard-go.exe%NC%
+    echo [SUCCESS] Windows build completed: wireguard-go.exe
 ) else (
-    echo %RED%❌ Windows 构建失败%NC%
+    echo [ERROR] Windows build failed
     exit /b 1
 )
 goto :end
 
 :build_all
-echo %YELLOW%🔨 构建所有平台...%NC%
+echo [INFO] Building all platforms...
 
-echo 构建 Windows...
+echo Building Windows...
 go build -o wireguard-go-windows.exe .
 if %errorLevel% equ 0 (
-    echo %GREEN%✅ Windows 构建完成%NC%
+    echo [SUCCESS] Windows building completed
 ) else (
-    echo %RED%❌ Windows 构建失败%NC%
+    echo [ERROR] Windows building failed
 )
 
-echo 构建 Linux...
+echo Building Linux...
 set GOOS=linux
 set GOARCH=amd64
 go build -o wireguard-go-linux .
 if %errorLevel% equ 0 (
-    echo %GREEN%✅ Linux 构建完成%NC%
+    echo [SUCCESS] Linux building completed
 ) else (
-    echo %RED%❌ Linux 构建失败%NC%
+    echo [ERROR] Linux building failed
 )
 
-echo 构建 macOS...
+echo Building macOS...
 set GOOS=darwin
 set GOARCH=amd64
 go build -o wireguard-go-macos .
 if %errorLevel% equ 0 (
-    echo %GREEN%✅ macOS 构建完成%NC%
+    echo [SUCCESS] macOS building completed
 ) else (
-    echo %RED%❌ macOS 构建失败%NC%
+    echo [ERROR] macOS building failed
 )
 
-REM 重置环境变量
+REM Reset environment variables
 set GOOS=
 set GOARCH=
 
-echo %GREEN%🎉 所有平台构建完成!%NC%
+echo [SUCCESS] All platforms building completed!
 goto :end
 
 :build_tools
-echo %YELLOW%🔧 构建命令行工具...%NC%
+echo [INFO] Building command line tools...
 cd cmd\wg-go
 go build -o wg-go.exe .
 if %errorLevel% equ 0 (
-    echo %GREEN%✅ 命令行工具构建完成: cmd\wg-go\wg-go.exe%NC%
+    echo [SUCCESS] Command line tools building completed: cmd\wg-go\wg-go.exe
 ) else (
-    echo %RED%❌ 命令行工具构建失败%NC%
+    echo [ERROR] Command line tools building failed
     exit /b 1
 )
 cd ..\..
 
-REM 构建 Linux/macOS 版本
+REM Building Linux/macOS versions
 set GOOS=linux
 set GOARCH=amd64
 go build -o wg-go-linux .
 if %errorLevel% equ 0 (
-    echo %GREEN%✅ Linux 命令行工具构建完成%NC%
+    echo [SUCCESS] Linux command line tools building completed
 ) else (
-    echo %RED%❌ Linux 命令行工具构建失败%NC%
+    echo [ERROR] Linux command line tools building failed
 )
 
 set GOOS=darwin
 set GOARCH=amd64
 go build -o wg-go-macos .
 if %errorLevel% equ 0 (
-    echo %GREEN%✅ macOS 命令行工具构建完成%NC%
+    echo [SUCCESS] macOS command line tools building completed
 ) else (
-    echo %RED%❌ macOS 命令行工具构建失败%NC%
+    echo [ERROR] macOS command line tools building failed
 )
 
-REM 重置环境变量
+REM Reset environment variables
 set GOOS=
 set GOARCH=
 
 goto :end
 
 :clean
-echo %YELLOW%🧹 清理构建文件...%NC%
+echo [INFO] Cleaning build files...
 if exist "wireguard-go.exe" del "wireguard-go.exe"
 if exist "wireguard-go-windows.exe" del "wireguard-go-windows.exe"
 if exist "wireguard-go-linux" del "wireguard-go-linux"
@@ -138,28 +130,28 @@ if exist "cmd\wg-go\wg-go.exe" del "cmd\wg-go\wg-go.exe"
 if exist "cmd\wg-go\wg-go-linux" del "cmd\wg-go\wg-go-linux"
 if exist "cmd\wg-go\wg-go-macos" del "cmd\wg-go\wg-go-macos"
 if exist "*.log" del "*.log"
-echo %GREEN%✅ 清理完成%NC%
+echo [SUCCESS] Cleaning completed
 goto :end
 
 :test
-echo %YELLOW%🧪 运行测试...%NC%
+echo [INFO] Running tests...
 go test ./...
 if %errorLevel% equ 0 (
-    echo %GREEN%✅ 测试完成%NC%
+    echo [SUCCESS] Tests completed
 ) else (
-    echo %RED%❌ 测试失败%NC%
+    echo [ERROR] Tests failed
     exit /b 1
 )
 goto :end
 
 :deps
-echo %YELLOW%📦 安装依赖...%NC%
+echo [INFO] Installing dependencies...
 go mod tidy
 go mod download
 if %errorLevel% equ 0 (
-    echo %GREEN%✅ 依赖安装完成%NC%
+    echo [SUCCESS] Dependencies installed
 ) else (
-    echo %RED%❌ 依赖安装失败%NC%
+    echo [ERROR] Dependencies installation failed
     exit /b 1
 )
 goto :end

@@ -3,51 +3,50 @@ REM Download wintun.dll for Windows development
 
 setlocal enabledelayedexpansion
 
-REM Set colors
-for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
-set "GREEN=%ESC%[32m"
-set "RED=%ESC%[31m"
-set "YELLOW=%ESC%[33m"
-set "BLUE=%ESC%[34m"
-set "NC=%ESC%[0m"
+REM Set colors (simplified for better compatibility)
+set "GREEN="
+set "RED="
+set "YELLOW="
+set "BLUE="
+set "NC="
 
-echo %BLUE%========================================%NC%
-echo %BLUE%  WireGuard-Go Windows wintun.dll Download%NC%
-echo %BLUE%========================================%NC%
+echo ========================================
+echo   WireGuard-Go Windows wintun.dll Download
+echo ========================================
 echo.
 
-echo %YELLOW%📥 Downloading wintun.dll for Windows development...%NC%
+echo [INFO] Downloading wintun.dll for Windows development...
 
 REM Create wintun directory
 if not exist "wintun" mkdir wintun
 
 REM Download wintun-0.14.1.zip
-echo Downloading wintun-0.14.1.zip...
+echo [INFO] Downloading wintun-0.14.1.zip...
 powershell -Command "Invoke-WebRequest -Uri 'https://www.wintun.net/builds/wintun-0.14.1.zip' -OutFile 'wintun\wintun-0.14.1.zip'"
 if %errorLevel% neq 0 (
-    echo %RED%❌ Failed to download wintun-0.14.1.zip%NC%
+    echo [ERROR] Failed to download wintun-0.14.1.zip
     pause
     exit /b 1
 )
 
 REM Extract all architectures
-echo Extracting wintun.dll for all architectures...
+echo [INFO] Extracting wintun.dll for all architectures...
 cd wintun
 powershell -Command "Expand-Archive -Path 'wintun-0.14.1.zip' -DestinationPath '.' -Force"
 cd ..
 
 REM Verify extraction
 if exist "wintun\wintun\bin" (
-    echo %GREEN%✅ wintun.dll extracted successfully%NC%
+    echo [SUCCESS] wintun.dll extracted successfully
     echo Available architectures:
     dir wintun\wintun\bin
     
     echo.
-    echo %YELLOW%📋 wintun.dll files:%NC%
+    echo [INFO] wintun.dll files:
     for /r wintun\wintun\bin %%f in (wintun.dll) do echo %%f
     
     echo.
-    echo %GREEN%🎉 wintun.dll ready for Windows development!%NC%
+    echo [SUCCESS] wintun.dll ready for Windows development!
     echo Architecture mapping:
     echo   - amd64: wintun\wintun\bin\amd64\wintun.dll
     echo   - arm64: wintun\wintun\bin\arm64\wintun.dll
@@ -56,7 +55,7 @@ if exist "wintun\wintun\bin" (
     
     REM Copy wintun.dll to current directory based on system architecture
     echo.
-    echo %YELLOW%📋 Copying wintun.dll to current directory...%NC%
+    echo [INFO] Copying wintun.dll to current directory...
     
     REM Detect system architecture
     set "WINTUN_ARCH=amd64"
@@ -69,18 +68,18 @@ if exist "wintun\wintun\bin" (
     ) else if "%PROCESSOR_ARCHITECTURE%"=="ARM" (
         set "WINTUN_ARCH=arm"
     ) else (
-        echo %YELLOW%⚠️  Unknown architecture: %PROCESSOR_ARCHITECTURE%, defaulting to amd64%NC%
+        echo [WARNING] Unknown architecture: %PROCESSOR_ARCHITECTURE%, defaulting to amd64
         set "WINTUN_ARCH=amd64"
     )
     
-    echo Detected architecture: %PROCESSOR_ARCHITECTURE% -^> %WINTUN_ARCH%
+    echo Detected architecture: %PROCESSOR_ARCHITECTURE% -^> !WINTUN_ARCH!
     
     REM Copy the appropriate wintun.dll
-    if exist "wintun\wintun\bin\%WINTUN_ARCH%\wintun.dll" (
-        copy "wintun\wintun\bin\%WINTUN_ARCH%\wintun.dll" "wintun.dll" >nul
-        echo %GREEN%✅ Copied wintun.dll for %WINTUN_ARCH% to current directory%NC%
+    if exist "wintun\wintun\bin\!WINTUN_ARCH!\wintun.dll" (
+        copy "wintun\wintun\bin\!WINTUN_ARCH!\wintun.dll" "wintun.dll" >nul
+        echo [SUCCESS] Copied wintun.dll for !WINTUN_ARCH! to current directory
     ) else (
-        echo %RED%❌ wintun.dll for %WINTUN_ARCH% not found%NC%
+        echo [ERROR] wintun.dll for !WINTUN_ARCH! not found
         echo Available architectures:
         dir wintun\wintun\bin
         pause
@@ -88,19 +87,19 @@ if exist "wintun\wintun\bin" (
     )
     
     echo.
-    echo %GREEN%🎉 Setup completed successfully!%NC%
-    echo %YELLOW%📋 Files in current directory:%NC%
+    echo [SUCCESS] Setup completed successfully!
+    echo [INFO] Files in current directory:
     dir *.exe *.dll 2>nul
     
 ) else (
-    echo %RED%❌ Failed to extract wintun.dll%NC%
+    echo [ERROR] Failed to extract wintun.dll
     pause
     exit /b 1
 )
 
 echo.
-echo %GREEN%✅ wintun.dll download and setup completed!%NC%
-echo %YELLOW%💡 You can now run: make build-windows%NC%
+echo [SUCCESS] wintun.dll download and setup completed!
+echo [INFO] You can now run: make build-windows
 echo.
 
 pause
