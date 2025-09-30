@@ -16,6 +16,7 @@ REM Configuration
 set "INTERFACE_NAME=wg0"
 set "CONFIG_FILE=wg0.conf"
 set "LOG_FILE=wireguard-go.log"
+set "WG_GO_PATH=cmd\wg-go\wg-go.exe"
 
 echo %BLUE%========================================%NC%
 echo %BLUE%  WireGuard-Go Windows Quick Start Script%NC%

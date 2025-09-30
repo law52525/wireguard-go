@@ -64,6 +64,7 @@ download-wintun.bat
 
 # 3. 编译项目
 build.bat build
+bulid.bat build-tools
 
 # 4. 编辑配置
 notepad wg0.conf
@@ -80,6 +81,7 @@ cd wireguard-go
 
 # 2. 编译项目
 ./build.sh build
+./bulid.sh build-tools
 
 # 3. 编辑配置
 nano wg0.conf

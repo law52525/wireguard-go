@@ -106,30 +106,6 @@ build_tools() {
         echo -e "${RED}❌ 当前平台命令行工具构建失败${NC}"
     fi
     
-    # Windows
-    GOOS=windows GOARCH=amd64 go build -o wg-go-windows.exe .
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ Windows 命令行工具构建完成${NC}"
-    else
-        echo -e "${RED}❌ Windows 命令行工具构建失败${NC}"
-    fi
-    
-    # Linux
-    GOOS=linux GOARCH=amd64 go build -o wg-go-linux .
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ Linux 命令行工具构建完成${NC}"
-    else
-        echo -e "${RED}❌ Linux 命令行工具构建失败${NC}"
-    fi
-    
-    # macOS
-    GOOS=darwin GOARCH=amd64 go build -o wg-go-macos .
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ macOS 命令行工具构建完成${NC}"
-    else
-        echo -e "${RED}❌ macOS 命令行工具构建失败${NC}"
-    fi
-    
     cd ../..
 }
 

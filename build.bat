@@ -95,25 +95,6 @@ if %errorLevel% equ 0 (
 )
 cd ..\..
 
-REM Building Linux/macOS versions
-set GOOS=linux
-set GOARCH=amd64
-go build -o wg-go-linux .
-if %errorLevel% equ 0 (
-    echo [SUCCESS] Linux command line tools building completed
-) else (
-    echo [ERROR] Linux command line tools building failed
-)
-
-set GOOS=darwin
-set GOARCH=amd64
-go build -o wg-go-macos .
-if %errorLevel% equ 0 (
-    echo [SUCCESS] macOS command line tools building completed
-) else (
-    echo [ERROR] macOS command line tools building failed
-)
-
 REM Reset environment variables
 set GOOS=
 set GOARCH=
