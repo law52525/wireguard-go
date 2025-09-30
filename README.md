@@ -19,7 +19,7 @@ macOS)
 - **操作系统**: 
   - Windows 10/11 (x64, ARM64)
   - macOS 10.15+ (Intel, Apple Silicon)
-  - Linux (Ubuntu 18.04+, CentOS 7+, 其他发行版需测试)
+  - Linux (Ubuntu 18.04+, CentOS 7+, Fedora 42+, Arch Linux, 其他发行版需测试)
 - **Go 版本**: Go 1.19+ (推荐 Go 1.21+)
 - **权限**: 
   - Windows: 管理员权限
